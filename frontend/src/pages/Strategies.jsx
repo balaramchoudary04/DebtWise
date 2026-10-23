@@ -77,120 +77,76 @@ export default function Strategies() {
 
   return (
     <div data-testid="strategies-page">
-      <div className="mb-10">
-        <p className="text-label mb-3">Plans</p>
+      <div className="mb-8">
+        <p className="text-label mb-2">Plans</p>
         <h1 className="font-display text-4xl sm:text-5xl font-light tracking-tighter">
-          Strategy lab.
+          Strategies
         </h1>
-        <p className="text-slate-400 mt-2 text-sm max-w-2xl">
-          Same debts, four routes out. Slide the extra-payment dial to see how every dollar
-          accelerates your debt-free date.
+        <p className="text-slate-400 mt-2 text-sm max-w-xl">
+          Pick the payoff route that fits your goals. Add extra monthly payments to see how much faster you become debt-free.
         </p>
       </div>
 
-      {/* Help Me Choose - Goal Selector */}
-      <div className="glass rounded-2xl p-6 mb-8 border-blue-500/20" data-testid="help-me-choose-card">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+      {/* Goal Selector */}
+      <div className="glass rounded-xl p-4 mb-6" data-testid="help-me-choose-card">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-400" />
-            <h3 className="font-display text-lg font-medium text-white">Help Me Choose: What is your primary debt goal?</h3>
+            <Sparkles className="w-4 h-4 text-blue-400" />
+            <span className="text-xs uppercase tracking-wider text-slate-300 font-semibold">Your Main Goal</span>
           </div>
-          <span className="text-xs text-slate-400">Pick a goal to see our recommended path</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => setSelectedGoal("save_money")}
-            className={`p-4 rounded-xl border text-left transition-all relative ${
-              selectedGoal === "save_money"
-                ? "bg-blue-600/20 border-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.3)] ring-1 ring-blue-500"
-                : "bg-white/5 border-white/5 hover:border-white/20"
-            }`}
-            data-testid="goal-save-money"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-display font-medium text-white text-base">💰 Pay Least Interest</span>
-              {selectedGoal === "save_money" && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-400/30">
-                  Active Focus
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Minimizes total money paid to lenders by attacking high APRs first.
-            </p>
-            <div className="mt-3 text-[11px] font-semibold text-blue-400 flex items-center gap-1">
-              Recommended: <span>Save Most Money (Avalanche)</span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGoal("motivation")}
-            className={`p-4 rounded-xl border text-left transition-all relative ${
-              selectedGoal === "motivation"
-                ? "bg-emerald-600/20 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)] ring-1 ring-emerald-500"
-                : "bg-white/5 border-white/5 hover:border-white/20"
-            }`}
-            data-testid="goal-motivation"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-display font-medium text-white text-base">⚡ Fast Wins & Morale</span>
-              {selectedGoal === "motivation" && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-400/30">
-                  Active Focus
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Eliminates small balances fast to build psychological momentum and kill open bills.
-            </p>
-            <div className="mt-3 text-[11px] font-semibold text-emerald-400 flex items-center gap-1">
-              Recommended: <span>Fastest Motivation (Snowball)</span>
-            </div>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setSelectedGoal("cash_flow")}
-            className={`p-4 rounded-xl border text-left transition-all relative ${
-              selectedGoal === "cash_flow"
-                ? "bg-amber-600/20 border-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.3)] ring-1 ring-amber-500"
-                : "bg-white/5 border-white/5 hover:border-white/20"
-            }`}
-            data-testid="goal-cash-flow"
-          >
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="font-display font-medium text-white text-base">💵 Free Up Monthly Cash</span>
-              {selectedGoal === "cash_flow" && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-400/30">
-                  Active Focus
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Knocks out debts requiring your largest monthly check so you get breathing room quickly.
-            </p>
-            <div className="mt-3 text-[11px] font-semibold text-amber-400 flex items-center gap-1">
-              Recommended: <span>Cash Flow Relief</span>
-            </div>
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedGoal("save_money")}
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1.5 ${
+                selectedGoal === "save_money"
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20 ring-1 ring-blue-400/40"
+                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+              data-testid="goal-save-money"
+            >
+              <span>💰</span> Pay Least Interest
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedGoal("motivation")}
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1.5 ${
+                selectedGoal === "motivation"
+                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 ring-1 ring-emerald-400/40"
+                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+              data-testid="goal-motivation"
+            >
+              <span>⚡</span> Quick Wins First
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedGoal("cash_flow")}
+              className={`px-3.5 py-2 rounded-lg text-xs font-medium transition-all text-center flex items-center justify-center gap-1.5 ${
+                selectedGoal === "cash_flow"
+                  ? "bg-amber-600 text-white shadow-lg shadow-amber-500/20 ring-1 ring-amber-400/40"
+                  : "bg-white/5 text-slate-400 hover:text-white hover:bg-white/10"
+              }`}
+              data-testid="goal-cash-flow"
+            >
+              <span>💵</span> Lower Monthly Bills
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Extra payment slider */}
-      <div className="glass rounded-2xl p-6 mb-8" data-testid="extra-payment-card">
-        <div className="flex items-center justify-between mb-5">
+      <div className="glass rounded-xl p-5 mb-8" data-testid="extra-payment-card">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-label">Extra monthly payment</p>
-            <p className="font-display text-3xl font-light tracking-tight mt-2">
-              {fmtMoney(extra)} <span className="text-sm text-slate-500">/ month</span>
+            <p className="font-display text-2xl sm:text-3xl font-light tracking-tight mt-1">
+              {fmtMoney(extra)} <span className="text-xs text-slate-500">/ month</span>
             </p>
           </div>
           {best && (
-            <div className="glass-subtle rounded-lg px-3 py-2 flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-amber-400" />
+            <div className="glass-subtle rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-xs text-slate-300">
                 Cheapest:{" "}
                 <span className="text-white font-medium">
@@ -206,49 +162,44 @@ export default function Strategies() {
           max={2000}
           step={25}
           onValueCommit={onExtraCommit}
-          className="mt-2"
+          className="mt-1"
           data-testid="extra-payment-slider"
         />
-        <div className="flex justify-between text-xs text-slate-500 mt-2">
-          <span>$0</span>
-          <span>$1,000</span>
-          <span>$2,000</span>
+        <div className="flex justify-between text-[11px] text-slate-500 mt-2">
+          <span>+$0/mo</span>
+          <span>+$1,000/mo</span>
+          <span>+$2,000/mo</span>
         </div>
       </div>
 
       {/* Strategy cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
         {STRATEGIES.map((s) => {
           if (s.key === "custom") {
             return (
               <button
                 key={s.key}
                 onClick={() => navigate("/strategies/custom")}
-                className="text-left glass rounded-2xl p-6 hover:bg-slate-800/50 hover:border-white/20 transition-all relative flex flex-col justify-between"
+                className="text-left glass rounded-xl p-5 hover:bg-slate-800/50 hover:border-white/20 transition-all flex flex-col justify-between"
                 data-testid={`strategy-${s.key}`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ background: s.color, boxShadow: `0 0 8px ${s.color}` }}
-                      />
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                        {s.sublabel}
-                      </span>
-                    </div>
+                    <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                      {s.sublabel}
+                    </span>
                   </div>
-                  <h3 className="font-display text-2xl font-medium tracking-tight mb-1 text-white">
+                  <h3 className="font-display text-xl font-medium tracking-tight mb-2 text-white">
                     {s.label}
                   </h3>
-                  <p className="text-xs text-slate-400 mb-3">{s.tagline}</p>
-                  <p className="text-sm text-slate-300 mb-6">{s.desc}</p>
-                  <div className="border-t border-white/5 pt-4 space-y-2 text-xs text-slate-400">
-                    <p>Drag debts into your priority order, set per-debt extra payments, and simulate instantly.</p>
+                  <p className="text-xs text-slate-300 leading-relaxed mb-4">{s.desc}</p>
+                  
+                  <div className="glass-subtle rounded-lg p-3 text-xs text-slate-400 space-y-1 border border-white/5">
+                    <p className="font-medium text-slate-200">Custom Priority</p>
+                    <p className="text-[11px] text-slate-400">Drag to order debts or allocate extra payments freely.</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs text-blue-400 mt-5 pt-4 border-t border-white/5">
+                <div className="flex items-center gap-1 text-xs text-blue-400 mt-4 pt-3 border-t border-white/5">
                   Build custom plan <ArrowRight className="w-3 h-3" />
                 </div>
               </button>
@@ -265,52 +216,54 @@ export default function Strategies() {
             <button
               key={s.key}
               onClick={() => navigate(`/strategies/${s.key}`)}
-              className={`text-left glass rounded-2xl p-6 hover:bg-slate-800/50 transition-all relative flex flex-col justify-between ${
+              className={`text-left glass rounded-xl p-5 hover:bg-slate-800/50 transition-all flex flex-col justify-between ${
                 matchesGoal
-                  ? "border-blue-500/70 shadow-[0_0_25px_rgba(37,99,235,0.25)] ring-1 ring-blue-500/50"
+                  ? "border-blue-500/70 shadow-[0_0_20px_rgba(37,99,235,0.2)] ring-1 ring-blue-500/40"
                   : isBest
-                  ? "border-blue-500/40"
+                  ? "border-blue-500/30"
                   : "hover:border-white/20"
               }`}
               data-testid={`strategy-${s.key}`}
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ background: s.color, boxShadow: `0 0 8px ${s.color}` }}
-                    />
-                    <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
-                      {s.sublabel}
-                    </span>
-                  </div>
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                    {s.sublabel}
+                  </span>
                   {matchesGoal ? (
-                    <span className="text-[10px] uppercase tracking-widest text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-2 py-0.5 font-bold">
-                      Your Goal Pick
+                    <span className="text-[10px] uppercase tracking-wider text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-2 py-0.5 font-bold">
+                      Goal Match
                     </span>
                   ) : isBest ? (
-                    <span className="text-[10px] uppercase tracking-widest text-blue-300 bg-blue-500/15 border border-blue-500/30 rounded-full px-2 py-0.5 font-bold">
+                    <span className="text-[10px] uppercase tracking-wider text-blue-300 bg-blue-500/15 border border-blue-500/30 rounded-full px-2 py-0.5 font-bold">
                       Lowest Cost
                     </span>
                   ) : null}
                 </div>
-                <h3 className="font-display text-2xl font-medium tracking-tight mb-1 text-white">{s.label}</h3>
-                <p className="text-xs text-slate-400 mb-3">{s.tagline}</p>
-                <p className="text-sm text-slate-300 mb-6 leading-relaxed">{s.desc}</p>
+                <h3 className="font-display text-xl font-medium tracking-tight mb-2 text-white">{s.label}</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mb-4">{s.desc}</p>
+
                 {r ? (
-                  <div className="space-y-3 border-t border-white/5 pt-5">
-                    <Row label="Time to freedom" value={`${r.months} months`} />
-                    <Row label="Total interest" value={fmtMoney(r.total_interest)} />
-                    <Row label="Total paid" value={fmtMoney(r.total_paid)} />
-                    <Row label="Debt-free by" value={r.payoff_date || "—"} highlight />
+                  <div className="glass-subtle rounded-lg p-3 space-y-2 border border-white/5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 uppercase tracking-wider">Debt-Free</span>
+                      <span className="text-sm font-semibold text-blue-300">{r.payoff_date || "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 uppercase tracking-wider">Interest</span>
+                      <span className="text-xs font-medium text-slate-200">{fmtMoney(r.total_interest)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-slate-400 uppercase tracking-wider">Duration</span>
+                      <span className="text-xs font-medium text-slate-200">{r.months} months</span>
+                    </div>
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-500">Add debts to simulate.</p>
+                  <p className="text-xs text-slate-500">Add debts to simulate.</p>
                 )}
               </div>
-              <div className="flex items-center gap-1 text-xs text-blue-400 mt-5 pt-4 border-t border-white/5">
-                See detailed plan <ArrowRight className="w-3 h-3" />
+              <div className="flex items-center gap-1 text-xs text-blue-400 mt-4 pt-3 border-t border-white/5">
+                View plan details <ArrowRight className="w-3 h-3" />
               </div>
             </button>
           );
@@ -371,8 +324,8 @@ export default function Strategies() {
                   />
                   <Tooltip content={<GlassTooltip formatter={(v) => fmtMoney(v)} />} />
                   <Legend wrapperStyle={{ fontSize: 11, color: "#94a3b8" }} />
-                  <Line type="monotone" dataKey="avalanche" name="Save Most Money (Avalanche)" stroke="#2563EB" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="snowball" name="Fastest Motivation (Snowball)" stroke="#10B981" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="avalanche" name="Save Most Money" stroke="#2563EB" strokeWidth={2} dot={false} />
+                  <Line type="monotone" dataKey="snowball" name="Fastest Motivation" stroke="#10B981" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="highest_payment" name="Cash Flow Relief" stroke="#F59E0B" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
