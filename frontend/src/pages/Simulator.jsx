@@ -219,14 +219,15 @@ export default function Simulator() {
                   <button
                     key={s.key}
                     onClick={() => setStrategy(s.key)}
-                    className={`p-3 rounded-lg text-sm border transition-all ${
+                    className={`p-3 rounded-lg text-left border transition-all ${
                       strategy === s.key
-                        ? "bg-blue-600/15 border-blue-500/40 text-white"
+                        ? "bg-blue-600/15 border-blue-500/40 text-white shadow-[0_0_15px_rgba(37,99,235,0.2)]"
                         : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
                     }`}
                     data-testid={`sim-strategy-${s.key}`}
                   >
-                    {s.label}
+                    <div className="font-medium text-xs text-white">{s.label}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate">{s.sublabel}</div>
                   </button>
                 ))}
               </div>

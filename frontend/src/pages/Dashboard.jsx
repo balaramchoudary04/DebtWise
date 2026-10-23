@@ -87,7 +87,7 @@ export default function Dashboard() {
     recommendations.push({
       type: "info",
       title: "Interest Savings Match",
-      text: `Using the mathematically optimal Avalanche Strategy instead of the Snowball Strategy will save you ${fmtMoney(strategySavings)} in total interest payments!`,
+      text: `Using the Save Most Money strategy (Debt Avalanche) instead of Fastest Motivation (Snowball) will save you ${fmtMoney(strategySavings)} in total interest payments!`,
     });
   }
 
@@ -97,7 +97,7 @@ export default function Dashboard() {
     recommendations.push({
       type: "info",
       title: "Cash Flow Dominance Alert",
-      text: `"${dominantDebt.name}" requires ${fmtMoney(dominantDebt.min_payment)}/mo, representing ${percent}% of your total minimum payments. Clearing this first frees up cash flow fastest.`,
+      text: `"${dominantDebt.name}" requires ${fmtMoney(dominantDebt.min_payment)}/mo, representing ${percent}% of your total minimum payments. Clearing this with the Cash Flow Relief plan frees up your monthly budget fastest.`,
     });
   }
 
@@ -109,7 +109,7 @@ export default function Dashboard() {
     if (savings > 50 && months > 0) {
       recommendations.push({
         type: "success",
-        title: "Snowball Boost Opportunity",
+        title: "Accelerated Payoff Opportunity",
         text: `Adding just $100/month extra to your payments will shorten your payoff by ${months} months and save you ${fmtMoney(savings)} in lifetime interest!`,
       });
     }
@@ -126,11 +126,11 @@ export default function Dashboard() {
   // Milestones Engine
   const achievements = [
     {
-      id: "snowball_starter",
-      title: "Snowball Starter",
+      id: "momentum_starter",
+      title: "Momentum Starter",
       desc: "Add your first debt account to establish a baseline target.",
       unlocked: debts.length > 0,
-      icon: "❄️",
+      icon: "🎯",
     },
     {
       id: "debt_slasher",
@@ -221,7 +221,7 @@ export default function Dashboard() {
             <p>Average APR: {avgApr.toFixed(2)}%</p>
           </div>
           <div>
-            <p className="font-semibold text-slate-700">Projected Payoff (Avalanche)</p>
+            <p className="font-semibold text-slate-700">Projected Payoff: Save Most Money (Avalanche)</p>
             <p>Payoff Date: {avalanche?.payoff_date || "—"} ({avalanche?.months} months)</p>
             <p>Total Interest: {fmtMoney(avalanche?.total_interest)}</p>
             <p>Total Repayment: {fmtMoney(avalanche?.total_paid)}</p>
@@ -436,7 +436,7 @@ export default function Dashboard() {
               <div>
                 <p className="text-label">Projection</p>
                 <h3 className="font-display text-lg font-medium mt-1">
-                  Payoff timeline — Avalanche
+                  Payoff timeline — Save Most Money (Avalanche)
                 </h3>
               </div>
               <button
@@ -495,7 +495,7 @@ export default function Dashboard() {
               <h3 className="font-display text-lg font-medium mt-1">Payoff order pipeline</h3>
             </div>
             <div className="text-xs text-slate-400">
-              Based on the <span className="text-blue-400 font-medium">Avalanche Method</span> optimization
+              Based on the <span className="text-blue-400 font-medium">Save Most Money (Avalanche)</span> optimization
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

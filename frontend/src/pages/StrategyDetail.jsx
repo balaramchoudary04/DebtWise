@@ -64,6 +64,11 @@ export default function StrategyDetail() {
               className="w-2 h-2 rounded-full"
               style={{ background: meta.color, boxShadow: `0 0 8px ${meta.color}` }}
             />
+            {meta.sublabel && (
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-300 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full">
+                {meta.sublabel}
+              </span>
+            )}
             <span className="text-label">{meta.tagline}</span>
           </div>
           <h1 className="font-display text-4xl sm:text-5xl font-light tracking-tighter">

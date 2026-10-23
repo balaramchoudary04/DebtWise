@@ -64,8 +64,7 @@ export default function Landing() {
           </h1>
 
           <p className="text-lg sm:text-xl text-slate-300 max-w-2xl leading-relaxed mb-10 animate-fade-up delay-200">
-            Track every loan, every card, every dollar. DebtWise compares avalanche, snowball, and
-            custom payoff plans so you find the fastest, cheapest path to debt-free.
+            Track every loan, every card, every dollar. DebtWise compares payoff strategies that save you the most money, build quick motivation, or free up monthly cash flow.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 animate-fade-up delay-300">
@@ -100,26 +99,30 @@ export default function Landing() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           <FeatureCard
             icon={<TrendingDown className="w-6 h-6 text-blue-400" />}
-            label="Avalanche"
-            title="Highest interest first"
-            desc="Mathematically the cheapest path. Kills the debt costing you most every month."
+            title="Save Most Money"
+            method="Debt Avalanche Method"
+            tagline="Highest APR first"
+            desc="Mathematically the cheapest path. Kills the debt costing you most in interest every month."
           />
           <FeatureCard
             icon={<Snowflake className="w-6 h-6 text-emerald-400" />}
-            label="Snowball"
-            title="Smallest balance first"
-            desc="Stack quick wins. Behavioral momentum that keeps you motivated for the long haul."
+            title="Fastest Motivation"
+            method="Debt Snowball Method"
+            tagline="Smallest balance first"
+            desc="Stack quick wins. Knock out small balances quickly to gain momentum and reduce open bills."
           />
           <FeatureCard
             icon={<Zap className="w-6 h-6 text-amber-400" />}
-            label="Highest Payment"
-            title="Free up cash flow"
-            desc="Knock out the debt eating your monthly budget so you breathe sooner."
+            title="Cash Flow Relief"
+            method="Highest Payment First"
+            tagline="Free up monthly budget"
+            desc="Knock out the debt eating the largest chunk of your monthly budget so you breathe sooner."
           />
           <FeatureCard
             icon={<Target className="w-6 h-6 text-fuchsia-400" />}
-            label="Custom"
-            title="Your priority order"
+            title="Custom Order"
+            method="Your Priority Order"
+            tagline="Personalized sequence"
             desc="Drag debts into your preferred order. We simulate the rest, month by month."
           />
         </div>
@@ -163,18 +166,23 @@ export default function Landing() {
   );
 }
 
-function FeatureCard({ icon, label, title, desc }) {
+function FeatureCard({ icon, title, method, tagline, desc }) {
   return (
     <div
       className="glass rounded-2xl p-6 hover:bg-slate-800/50 hover:border-white/20 transition-all duration-300 group"
-      data-testid={`feature-${label.toLowerCase()}`}
+      data-testid={`feature-${title.toLowerCase().replace(/\s+/g, "-")}`}
     >
       <div className="w-12 h-12 rounded-xl glass-subtle flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
         {icon}
       </div>
-      <p className="text-label mb-2">{label}</p>
-      <h4 className="font-display text-lg font-medium mb-2 tracking-tight">{title}</h4>
-      <p className="text-sm text-slate-400 leading-relaxed">{desc}</p>
+      <div className="flex items-center gap-2 mb-1.5">
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+          {method}
+        </span>
+      </div>
+      <h4 className="font-display text-lg font-medium mb-1 tracking-tight">{title}</h4>
+      <p className="text-xs text-slate-400 mb-3">{tagline}</p>
+      <p className="text-sm text-slate-300 leading-relaxed">{desc}</p>
     </div>
   );
 }
