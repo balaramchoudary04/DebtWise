@@ -12,6 +12,7 @@ import Simulator from "./pages/Simulator";
 import Settings from "./pages/Settings";
 import StrategyCustom from "./pages/StrategyCustom";
 import AuthCallback from "./pages/AuthCallback";
+import CreditScore from "./pages/CreditScore";
 import AppLayout from "./components/AppLayout";
 
 function ProtectedRoute({ children }) {
@@ -49,6 +50,7 @@ function AppRouter() {
         <Route path="/strategies/custom" element={<StrategyCustom />} />
         <Route path="/strategies/:strategy" element={<StrategyDetail />} />
         <Route path="/simulator" element={<Simulator />} />
+        <Route path="/credit-score" element={<CreditScore />} />
         <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -4,9 +4,8 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   TrendingDown,
   LayoutDashboard,
-  Wallet,
   GitCompare,
-  Calculator,
+  Gauge,
   Settings as SettingsIcon,
   LogOut,
 } from "lucide-react";
@@ -14,10 +13,8 @@ import { toast } from "sonner";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
-  { to: "/debts", label: "My Debts", icon: Wallet, testid: "nav-debts" },
   { to: "/strategies", label: "Strategies", icon: GitCompare, testid: "nav-strategies" },
-  { to: "/simulator", label: "Simulator", icon: Calculator, testid: "nav-simulator" },
-  { to: "/settings", label: "Settings", icon: SettingsIcon, testid: "nav-settings" },
+  { to: "/credit-score", label: "Credit Score", icon: Gauge, testid: "nav-credit-score" },
 ];
 
 export default function AppLayout() {
@@ -86,14 +83,24 @@ export default function AppLayout() {
               <p className="text-xs text-slate-500 truncate">{user?.email}</p>
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="mt-3 w-full flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg py-2 transition-colors"
-            data-testid="logout-btn"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Sign out
-          </button>
+          <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-white/5">
+            <button
+              onClick={() => navigate("/settings")}
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg py-1.5 transition-colors"
+              data-testid="settings-btn"
+            >
+              <SettingsIcon className="w-3.5 h-3.5" />
+              Settings
+            </button>
+            <button
+              onClick={onLogout}
+              className="flex-1 flex items-center justify-center gap-1.5 text-xs text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/20 rounded-lg py-1.5 transition-colors"
+              data-testid="logout-btn"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign out
+            </button>
+          </div>
         </div>
       </aside>
 
