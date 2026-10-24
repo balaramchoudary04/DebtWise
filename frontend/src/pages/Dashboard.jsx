@@ -64,6 +64,10 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [customizingLayout, setCustomizingLayout] = useState(false);
   const [showLayoutModal, setShowLayoutModal] = useState(false);
+  const [draggedWidgetIndex, setDraggedWidgetIndex] = useState(null);
+  const [dragOverWidgetIndex, setDragOverWidgetIndex] = useState(null);
+  const [draggedModalIndex, setDraggedModalIndex] = useState(null);
+  const [dragOverModalIndex, setDragOverModalIndex] = useState(null);
 
   const [widgets, setWidgets] = useState(() => {
     try {
@@ -823,25 +827,75 @@ export default function Dashboard() {
             const meta = DEFAULT_WIDGETS.find((dw) => dw.id === widget.id) || { title: widget.id };
             if (!widget.visible && !customizingLayout) return null;
 
+            const isDragging = draggedWidgetIndex === index;
+            const isDragOver = dragOverWidgetIndex === index;
+
             return (
               <div
                 key={widget.id}
-                className={`transition-all duration-300 ${
+                draggable={customizingLayout}
+                onDragStart={(e) => {
+                  setDraggedWidgetIndex(index);
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", index.toString());
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (dragOverWidgetIndex !== index) {
+                    setDragOverWidgetIndex(index);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverWidgetIndex === index) {
+                    setDragOverWidgetIndex(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggedWidgetIndex === null || draggedWidgetIndex === index) {
+                    setDraggedWidgetIndex(null);
+                    setDragOverWidgetIndex(null);
+                    return;
+                  }
+                  const updated = [...widgets];
+                  const [moved] = updated.splice(draggedWidgetIndex, 1);
+                  updated.splice(index, 0, moved);
+                  saveLayout(updated);
+                  setDraggedWidgetIndex(null);
+                  setDragOverWidgetIndex(null);
+                  toast.success("Widget order updated!");
+                }}
+                onDragEnd={() => {
+                  setDraggedWidgetIndex(null);
+                  setDragOverWidgetIndex(null);
+                }}
+                className={`transition-all duration-200 ${
                   customizingLayout
-                    ? "p-4 rounded-3xl border-2 border-dashed border-blue-500/40 bg-blue-950/10 mb-8 relative"
+                    ? `p-4 rounded-3xl border-2 border-dashed mb-8 relative ${
+                        isDragging
+                          ? "opacity-30 border-blue-400 bg-blue-950/40 scale-[0.99]"
+                          : isDragOver
+                          ? "border-blue-500 bg-blue-600/15 ring-2 ring-blue-500 shadow-[0_0_35px_rgba(37,99,235,0.3)] scale-[1.01]"
+                          : "border-blue-500/40 bg-blue-950/10 hover:border-blue-400/70"
+                      }`
                     : ""
                 }`}
               >
                 {customizingLayout && (
                   <div className="mb-4 pb-3 border-b border-blue-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <GripVertical className="w-4 h-4 text-blue-400" />
+                    <div
+                      className="flex items-center gap-2 cursor-grab active:cursor-grabbing select-none"
+                      title="Click and drag to reorder"
+                    >
+                      <GripVertical className="w-4 h-4 text-blue-400 shrink-0" />
                       <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
                         #{index + 1}
                       </span>
                       <span className="font-display font-medium text-white text-sm">
                         {meta.title}
                       </span>
+                      <span className="text-[10px] text-slate-400 font-normal hidden sm:inline">(Drag to reorder)</span>
                       {!widget.visible && (
                         <span className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-bold">
                           Hidden in normal view
@@ -902,7 +956,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <h3 className="font-display text-lg font-medium text-white">Arrange Dashboard Widgets</h3>
-                    <p className="text-xs text-slate-400">Drag sequence, move up/down, or toggle visibility</p>
+                    <p className="text-xs text-slate-400">Drag items to reorder, use arrows, or toggle visibility</p>
                   </div>
                 </div>
                 <button
@@ -916,16 +970,60 @@ export default function Dashboard() {
               <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
                 {widgets.map((widget, index) => {
                   const meta = DEFAULT_WIDGETS.find((dw) => dw.id === widget.id) || { title: widget.id, desc: "" };
+                  const isModalDragging = draggedModalIndex === index;
+                  const isModalDragOver = dragOverModalIndex === index;
+
                   return (
                     <div
                       key={widget.id}
-                      className={`p-3 rounded-xl border transition flex items-center justify-between gap-3 ${
-                        widget.visible
+                      draggable={true}
+                      onDragStart={(e) => {
+                        setDraggedModalIndex(index);
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", index.toString());
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        if (dragOverModalIndex !== index) {
+                          setDragOverModalIndex(index);
+                        }
+                      }}
+                      onDragLeave={() => {
+                        if (dragOverModalIndex === index) {
+                          setDragOverModalIndex(null);
+                        }
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (draggedModalIndex === null || draggedModalIndex === index) {
+                          setDraggedModalIndex(null);
+                          setDragOverModalIndex(null);
+                          return;
+                        }
+                        const updated = [...widgets];
+                        const [moved] = updated.splice(draggedModalIndex, 1);
+                        updated.splice(index, 0, moved);
+                        saveLayout(updated);
+                        setDraggedModalIndex(null);
+                        setDragOverModalIndex(null);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedModalIndex(null);
+                        setDragOverModalIndex(null);
+                      }}
+                      className={`p-3 rounded-xl border transition cursor-grab active:cursor-grabbing flex items-center justify-between gap-3 ${
+                        isModalDragging
+                          ? "opacity-30 border-blue-400 bg-blue-950/40"
+                          : isModalDragOver
+                          ? "border-blue-500 bg-blue-600/15 ring-2 ring-blue-500/50 scale-[1.01]"
+                          : widget.visible
                           ? "bg-white/[0.03] border-white/10 hover:border-white/20"
                           : "bg-slate-900/40 border-white/5 opacity-50"
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
+                        <GripVertical className="w-4 h-4 text-slate-500 shrink-0" />
                         <span className="font-mono text-xs font-bold text-slate-400 w-5 text-center">
                           {index + 1}
                         </span>
