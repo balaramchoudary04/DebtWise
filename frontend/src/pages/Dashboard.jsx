@@ -29,6 +29,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import PaymentCalendar from "../components/PaymentCalendar";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -577,82 +578,40 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Advisor & Reminders Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
-          {/* Smart Payoff Advisor */}
-          <div className="glass rounded-2xl p-6 lg:col-span-2" data-testid="card-smart-advisor">
-            <div className="mb-6 flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-blue-400" />
-              <div>
-                <p className="text-label">Strategy Advisor</p>
-                <h3 className="font-display text-lg font-medium mt-1">Smart recommendations</h3>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recommendations.map((rec, index) => (
-                <div 
-                  key={index}
-                  className={`p-4 rounded-xl border text-xs leading-relaxed transition-all duration-300 ${
-                    rec.type === "warning" 
-                      ? "bg-rose-500/10 border-rose-500/20 text-rose-300 shadow-[0_0_15px_rgba(239,68,68,0.05)]"
-                      : rec.type === "success"
-                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                      : "bg-blue-500/10 border-blue-500/20 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.05)]"
-                  }`}
-                >
-                  <div className="font-semibold mb-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-                    {rec.type === "warning" ? <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> : <Zap className="w-3.5 h-3.5" />}
-                    {rec.title}
-                  </div>
-                  {rec.text}
-                </div>
-              ))}
+        {/* Interactive Payment Calendar & Bill Tracker */}
+        <PaymentCalendar
+          debts={debts}
+          onRefreshDebts={() => api.get("/debts").then((r) => setDebts(r.data))}
+        />
+
+        {/* Smart Payoff Advisor */}
+        <div className="glass rounded-2xl p-6 mb-10" data-testid="card-smart-advisor">
+          <div className="mb-6 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-400" />
+            <div>
+              <p className="text-label">Strategy Advisor</p>
+              <h3 className="font-display text-lg font-medium mt-1">Smart recommendations</h3>
             </div>
           </div>
-
-          {/* Upcoming Due Dates */}
-          <div className="glass rounded-2xl p-6 lg:col-span-1" data-testid="card-reminders">
-            <div className="mb-6">
-              <p className="text-label">Upcoming</p>
-              <h3 className="font-display text-lg font-medium mt-1">Due dates</h3>
-            </div>
-            {reminders.length === 0 ? (
-              <div className="text-sm text-slate-400 text-center py-8">
-                <CalendarClock className="w-8 h-8 mx-auto mb-3 text-slate-600" />
-                Add due dates to your debts to see reminders.
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recommendations.map((rec, index) => (
+              <div 
+                key={index}
+                className={`p-4 rounded-xl border text-xs leading-relaxed transition-all duration-300 ${
+                  rec.type === "warning" 
+                    ? "bg-rose-500/10 border-rose-500/20 text-rose-300 shadow-[0_0_15px_rgba(239,68,68,0.05)]"
+                    : rec.type === "success"
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                    : "bg-blue-500/10 border-blue-500/20 text-blue-300 shadow-[0_0_15px_rgba(59,130,246,0.05)]"
+                }`}
+              >
+                <div className="font-semibold mb-1.5 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+                  {rec.type === "warning" ? <AlertCircle className="w-3.5 h-3.5 text-rose-400" /> : <Zap className="w-3.5 h-3.5" />}
+                  {rec.title}
+                </div>
+                {rec.text}
               </div>
-            ) : (
-              <div className="space-y-3">
-                {reminders.slice(0, 5).map((r) => (
-                  <div
-                    key={r.debt_id}
-                    className="flex items-center justify-between gap-3 text-sm"
-                    data-testid={`reminder-${r.debt_id}`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{r.name}</p>
-                      <p className="text-xs text-slate-500">{r.due_date}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-sm font-medium">{fmtMoney(r.min_payment)}</div>
-                      <div
-                        className={`text-xs ${
-                          r.days_until <= 3 ? "text-red-400" : "text-slate-500"
-                        }`}
-                      >
-                        {r.days_until <= 0 ? (
-                          <span className="inline-flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> due today
-                          </span>
-                        ) : (
-                          `${r.days_until}d left`
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            ))}
           </div>
         </div>
 

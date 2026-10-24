@@ -895,6 +895,150 @@ async def upcoming_reminders(user: dict = Depends(get_current_user)):
 
 
 # ============================================================
+# Interactive Payment Calendar & Bill Tracker
+# ============================================================
+class TogglePaymentPayload(BaseModel):
+    debt_id: str
+    year: int
+    month: int
+    is_paid: bool
+
+
+class UpdateDueDayPayload(BaseModel):
+    due_day: int = Field(ge=1, le=31)
+
+
+@api_router.get("/calendar/month")
+async def get_calendar_month(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    user: dict = Depends(get_current_user),
+):
+    import calendar
+    today = datetime.now(timezone.utc).date()
+    target_year = year or today.year
+    target_month = month or today.month
+
+    debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=1000)
+    paid_logs = await db.payment_logs.find(
+        {"user_id": user["user_id"], "year": target_year, "month": target_month},
+        {"_id": 0},
+    ).to_list(length=1000)
+    paid_map = {p["debt_id"]: p for p in paid_logs}
+
+    last_day_of_month = calendar.monthrange(target_year, target_month)[1]
+    events = []
+    total_due = 0.0
+    total_paid = 0.0
+
+    highest_apr_id = max(debts, key=lambda d: d.get("apr", 0))["debt_id"] if debts else None
+
+    for d in debts:
+        min_pay = float(d.get("min_payment", 0) or 0)
+        total_due += min_pay
+
+        due_day = None
+        due_iso = d.get("due_date")
+        if due_iso:
+            try:
+                parsed = datetime.fromisoformat(due_iso).date()
+                due_day = parsed.day
+            except (ValueError, TypeError):
+                due_day = None
+        if due_day is None and d.get("due_day"):
+            due_day = int(d["due_day"])
+
+        day = min(due_day or 15, last_day_of_month)
+        due_date_obj = date(target_year, target_month, day)
+        due_date_str = due_date_obj.strftime("%Y-%m-%d")
+
+        log = paid_map.get(d["debt_id"])
+        is_paid = bool(log and log.get("is_paid"))
+        if is_paid:
+            total_paid += min_pay
+
+        if is_paid:
+            status = "paid"
+        elif due_date_obj < today:
+            status = "overdue"
+        elif due_date_obj == today:
+            status = "due_today"
+        elif 0 < (due_date_obj - today).days <= 3:
+            status = "due_soon"
+        else:
+            status = "upcoming"
+
+        is_plaid = bool(d.get("plaid_account_id"))
+
+        events.append({
+            "debt_id": d["debt_id"],
+            "name": d["name"],
+            "type": d["type"],
+            "balance": float(d.get("balance", 0)),
+            "apr": float(d.get("apr", 0)),
+            "min_payment": min_pay,
+            "due_date": due_date_str,
+            "day": day,
+            "is_paid": is_paid,
+            "paid_at": log.get("paid_at") if log else None,
+            "status": status,
+            "is_plaid": is_plaid,
+            "is_priority": d["debt_id"] == highest_apr_id,
+            "days_until": (due_date_obj - today).days,
+        })
+
+    events.sort(key=lambda x: (x["day"], x["name"]))
+
+    return {
+        "year": target_year,
+        "month": target_month,
+        "total_due": round(total_due, 2),
+        "total_paid": round(total_paid, 2),
+        "total_remaining": round(max(0, total_due - total_paid), 2),
+        "paid_count": sum(1 for e in events if e["is_paid"]),
+        "total_count": len(events),
+        "events": events,
+    }
+
+
+@api_router.post("/calendar/toggle-paid")
+async def toggle_calendar_paid(
+    req: TogglePaymentPayload,
+    user: dict = Depends(get_current_user),
+):
+    now_iso = datetime.now(timezone.utc).isoformat()
+    await db.payment_logs.update_one(
+        {"user_id": user["user_id"], "debt_id": req.debt_id, "year": req.year, "month": req.month},
+        {"$set": {
+            "user_id": user["user_id"],
+            "debt_id": req.debt_id,
+            "year": req.year,
+            "month": req.month,
+            "is_paid": req.is_paid,
+            "paid_at": now_iso if req.is_paid else None,
+            "updated_at": now_iso,
+        }},
+        upsert=True,
+    )
+    return {"success": True, "debt_id": req.debt_id, "is_paid": req.is_paid}
+
+
+@api_router.post("/debts/{debt_id}/due-day")
+async def update_debt_due_day(
+    debt_id: str,
+    req: UpdateDueDayPayload,
+    user: dict = Depends(get_current_user),
+):
+    res = await db.debts.update_one(
+        {"debt_id": debt_id, "user_id": user["user_id"]},
+        {"$set": {"due_day": req.due_day}},
+    )
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Debt not found")
+    return {"success": True, "debt_id": debt_id, "due_day": req.due_day}
+
+
+# ============================================================
 # Notification helpers (no-op if keys missing)
 # ============================================================
 def email_enabled() -> bool:
