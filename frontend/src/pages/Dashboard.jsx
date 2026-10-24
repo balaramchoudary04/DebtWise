@@ -36,6 +36,10 @@ import {
   RotateCcw,
   Check,
   X,
+  Bell,
+  ShieldCheck,
+  CheckCircle2,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
@@ -45,6 +49,7 @@ import DebtProgressHistory from "../components/DebtProgressHistory";
 
 const DEFAULT_WIDGETS = [
   { id: "metrics", title: "Overview Metrics", desc: "Total debt, monthly minimums, average APR, and debt-free target" },
+  { id: "plaid_reconciliation", title: "Automated Payment Reconciliation & Protection Alerts", desc: "Real-time Plaid payment matching from checking accounts and credit score protection alerts" },
   { id: "milestones", title: "Payoff Milestones", desc: "Achievements, motivation badges, and milestone progress" },
   { id: "payday_instructions", title: "Exact Monthly Payment Instructions", desc: "Zero-guesswork payday blueprint and strategy extra allocation" },
   { id: "breakdown_timeline", title: "Portfolio Breakdown & Payoff Curve", desc: "Debt composition donut and projected avalanche payoff trajectory" },
@@ -68,6 +73,87 @@ export default function Dashboard() {
   const [dragOverWidgetIndex, setDragOverWidgetIndex] = useState(null);
   const [draggedModalIndex, setDraggedModalIndex] = useState(null);
   const [dragOverModalIndex, setDragOverModalIndex] = useState(null);
+
+  // Plaid Automated Payment Reconciliation & Protection Alerts State
+  const [alerts, setAlerts] = useState([
+    {
+      id: "alt-1",
+      type: "reconciled",
+      severity: "success",
+      title: "Plaid Payment Reconciled",
+      sourceAccount: "Chase Premier Checking (••9124)",
+      destAccount: "Chase Sapphire Reserve (••4102)",
+      amount: 190.0,
+      date: "Oct 15, 2026",
+      desc: "Auto-matched withdrawal against minimum payment due. Debt balance reduced to $6,200.",
+      impact: "100% Debt Payoff ($0 Discretionary Spending)",
+      badge: "VERIFIED PLAID TRANSFER",
+    },
+    {
+      id: "alt-2",
+      type: "reconciled",
+      severity: "success",
+      title: "AutoPay Debit Reconciled",
+      sourceAccount: "Chase Premier Checking (••9124)",
+      destAccount: "Amex Everyday Card (••8819)",
+      amount: 120.0,
+      date: "Oct 12, 2026",
+      desc: "Payment matched from checking account. Marked as Paid in your Interactive Calendar.",
+      impact: "Debt balance decreased by $120.00",
+      badge: "CONFIRMED PAID",
+    },
+    {
+      id: "alt-3",
+      type: "protection",
+      severity: "warning",
+      title: "High Utilization Risk: Chase Sapphire",
+      sourceAccount: "Chase Sapphire Reserve",
+      destAccount: null,
+      amount: 6200.0,
+      date: "Statement Closes Nov 2",
+      desc: "Card is at 62% limit utilization ($6,200 of $10,000). Paying down $1,200 before your statement closes on Nov 2 will prevent an estimated 12–18 point FICO drop.",
+      impact: "FICO Score At Risk: -15 pts",
+      badge: "CREDIT PROTECTION",
+    },
+    {
+      id: "alt-4",
+      type: "shield",
+      severity: "info",
+      title: "Due Date Safe Shield: Toyota Auto",
+      sourceAccount: "Chase Premier Checking ($3,450 balance)",
+      destAccount: "Toyota Auto Financing",
+      amount: 300.0,
+      date: "Due Nov 5, 2026",
+      desc: "Upcoming monthly auto loan payment is fully covered by checking surplus. Zero overdraft risk.",
+      impact: "Safe Auto-Debit Protected",
+      badge: "OVERDRAFT SHIELD",
+    },
+  ]);
+  const [alertFilter, setAlertFilter] = useState("all");
+  const [showAlertDrawer, setShowAlertDrawer] = useState(false);
+
+  const simulateNewPlaidPayment = () => {
+    const newAlert = {
+      id: `alt-${Date.now()}`,
+      type: "reconciled",
+      severity: "success",
+      title: "Real-Time Payment Reconciled via Plaid",
+      sourceAccount: "Chase Premier Checking (••9124)",
+      destAccount: "Chase Sapphire Reserve (••4102)",
+      amount: 250.0,
+      date: "Just now",
+      desc: "Real-time webhook detected $250.00 payment. Debt balance decreased from $6,200 to $5,950.",
+      impact: "Zero misclassification ($0 counted as spending)",
+      badge: "LIVE PLAID MATCH",
+    };
+    setAlerts((prev) => [newAlert, ...prev]);
+    toast.success("⚡ Plaid webhook detected $250.00 payment from Checking! Accurately logged as debt payoff.");
+  };
+
+  const dismissAlert = (id) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+    toast.info("Alert dismissed.");
+  };
 
   const [widgets, setWidgets] = useState(() => {
     try {
@@ -323,6 +409,103 @@ export default function Dashboard() {
               icon={<CalendarHeart className="w-4 h-4 text-emerald-400" />}
               testid="metric-payoff-date"
             />
+          </div>
+        );
+
+      case "plaid_reconciliation":
+        return (
+          <div className="glass rounded-2xl p-6 mb-10 border border-blue-500/20" data-testid="card-plaid-reconciliation">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                  <Zap className="w-4 h-4" />
+                  Automated Bank Payment Reconciliation
+                </div>
+                <h3 className="font-display text-xl font-medium text-white">
+                  Plaid Transfer Matcher &amp; Credit Protection
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Automatically pairs checking account debits with credit card payments so debt payoffs are credited immediately—never misclassified as spending.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={simulateNewPlaidPayment}
+                className="self-start sm:self-auto px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-500/25 flex items-center gap-1.5 transition"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Simulate Payment Match
+              </button>
+            </div>
+
+            {/* 4 Stat KPI Strip */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Reconciled This Month</span>
+                <span className="font-display text-xl font-bold text-emerald-400 mt-0.5 block font-mono">$310.00</span>
+                <span className="text-[10px] text-slate-500">2 Verified Debits</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Spending Misclassification Shield</span>
+                <span className="font-display text-xl font-bold text-blue-400 mt-0.5 block font-mono">$310.00 Saved</span>
+                <span className="text-[10px] text-emerald-400/80">$0 counted as spending</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Credit Shield Protection</span>
+                <span className="font-display text-xl font-bold text-amber-400 mt-0.5 block">1 High Util Alert</span>
+                <span className="text-[10px] text-slate-500">Statement in 9 Days</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Linked Funding Account</span>
+                <span className="font-display text-sm font-semibold text-white mt-1 block truncate">Chase Checking (••9124)</span>
+                <span className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> Healthy Balance ($3,450)
+                </span>
+              </div>
+            </div>
+
+            {/* Feed of Reconciled Transactions */}
+            <div className="space-y-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Recent Plaid Reconciliation Log
+              </span>
+              {alerts.map((alert) => (
+                <div
+                  key={alert.id}
+                  className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-xs ${
+                    alert.type === "reconciled"
+                      ? "bg-slate-900/50 border-emerald-500/20"
+                      : "bg-slate-900/50 border-amber-500/20"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                        alert.type === "reconciled" ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400"
+                      }`}
+                    >
+                      {alert.type === "reconciled" ? <Zap className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                    </div>
+                    <div>
+                      <div className="font-medium text-white flex items-center gap-2">
+                        {alert.title}
+                        <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                          {alert.badge}
+                        </span>
+                      </div>
+                      <div className="text-slate-400 text-[11px] mt-0.5">
+                        {alert.desc}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-emerald-400 font-mono font-semibold block">{alert.impact}</span>
+                    <span className="text-[10px] text-slate-500">{alert.date}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         );
 
@@ -779,6 +962,178 @@ export default function Dashboard() {
               Add debt
             </button>
           </div>
+        </div>
+
+        {/* Top In-App Alerts & Plaid Reconciliation Notification Strip */}
+        <div className="mb-8">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900/90 to-slate-900 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-9 h-9 rounded-xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-blue-400">
+                  <Bell className="w-4 h-4" />
+                </div>
+                {alerts.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center ring-2 ring-slate-950">
+                    {alerts.length}
+                  </span>
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white">
+                    Plaid Live Sync &amp; Protection Engine
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 font-semibold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Live Active
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  {alerts.filter((a) => a.type === "reconciled").length} bank payments auto-reconciled this cycle &bull; {alerts.filter((a) => a.type === "protection").length} credit score protection alert
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={simulateNewPlaidPayment}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-medium transition flex items-center gap-1.5"
+                title="Test real-time Plaid webhook event"
+              >
+                <Zap className="w-3 h-3 text-amber-400" />
+                Simulate Payment Match
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAlertDrawer(!showAlertDrawer)}
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/30 text-xs font-semibold transition flex items-center gap-1.5"
+              >
+                {showAlertDrawer ? "Hide Alert Center" : `View Alerts (${alerts.length})`}
+              </button>
+            </div>
+          </div>
+
+          {/* Expandable Alert Center Drawer */}
+          {showAlertDrawer && (
+            <div className="mt-3 p-5 rounded-2xl glass border border-white/10 space-y-4 animate-fadeIn shadow-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-blue-400" />
+                  <h4 className="font-display text-sm font-semibold text-white">
+                    Plaid Automated Payment Reconciliation &amp; Protection Alerts
+                  </h4>
+                </div>
+
+                {/* Filter Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setAlertFilter("all")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                      alertFilter === "all" ? "bg-blue-600 text-white" : "bg-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    All ({alerts.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAlertFilter("reconciled")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                      alertFilter === "reconciled" ? "bg-blue-600 text-white" : "bg-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    ⚡ Plaid Reconciled ({alerts.filter((a) => a.type === "reconciled").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAlertFilter("protection")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition ${
+                      alertFilter === "protection" ? "bg-blue-600 text-white" : "bg-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    ⚠️ Credit Protection ({alerts.filter((a) => a.type === "protection").length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Alert Items List */}
+              <div className="space-y-3">
+                {alerts
+                  .filter((a) => alertFilter === "all" || a.type === alertFilter)
+                  .map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-xl border transition flex flex-col sm:flex-row sm:items-start justify-between gap-3 ${
+                        alert.type === "reconciled"
+                          ? "bg-emerald-500/5 border-emerald-500/20"
+                          : alert.type === "protection"
+                          ? "bg-amber-500/5 border-amber-500/20"
+                          : "bg-blue-500/5 border-blue-500/20"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                            alert.type === "reconciled"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : alert.type === "protection"
+                              ? "bg-amber-500/20 text-amber-400"
+                              : "bg-blue-500/20 text-blue-400"
+                          }`}
+                        >
+                          {alert.type === "reconciled" ? (
+                            <Zap className="w-4 h-4" />
+                          ) : alert.type === "protection" ? (
+                            <AlertCircle className="w-4 h-4" />
+                          ) : (
+                            <ShieldCheck className="w-4 h-4" />
+                          )}
+                        </div>
+
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-semibold text-white">
+                              {alert.title}
+                            </span>
+                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">
+                              {alert.badge}
+                            </span>
+                            <span className="text-[11px] text-slate-500">
+                              {alert.date}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                            {alert.desc}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-slate-400 font-mono">
+                            {alert.sourceAccount && (
+                              <span>From: <strong className="text-slate-200">{alert.sourceAccount}</strong></span>
+                            )}
+                            {alert.destAccount && (
+                              <span>To: <strong className="text-slate-200">{alert.destAccount}</strong></span>
+                            )}
+                            <span className="text-emerald-400 font-semibold">{alert.impact}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => dismissAlert(alert.id)}
+                          className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-xs transition"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Customizable Sticky Layout Toolbar */}

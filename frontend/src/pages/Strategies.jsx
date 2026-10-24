@@ -42,7 +42,7 @@ import {
 import { toast } from "sonner";
 
 export default function Strategies() {
-  const [subTab, setSubTab] = useState("discover"); // "discover" | "compare"
+  const [subTab, setSubTab] = useState("discover"); // "discover" | "compare" | "transfer_radar"
   const [extra, setExtra] = useState(0);
   const [compare, setCompare] = useState(null);
   const [debts, setDebts] = useState([]);
@@ -52,6 +52,9 @@ export default function Strategies() {
   const [activeStrategyKey, setActiveStrategyKey] = useState(() => {
     return localStorage.getItem("debtwise_active_strategy") || "avalanche";
   });
+  const [selectedTransferCards, setSelectedTransferCards] = useState([]);
+  const [promoMonths, setPromoMonths] = useState(18);
+  const [transferFeePct, setTransferFeePct] = useState(3);
   const navigate = useNavigate();
 
   const fetchDebtsAndCompare = async (val = extra) => {
@@ -61,8 +64,13 @@ export default function Strategies() {
         api.get("/debts"),
         api.post("/strategies/compare", null, { params: { extra_payment: val } }),
       ]);
-      setDebts(debtsRes.data || []);
+      const debtList = debtsRes.data || [];
+      setDebts(debtList);
       setCompare(compareRes.data);
+      if (debtList.length > 0 && selectedTransferCards.length === 0) {
+        const highApr = debtList.filter((d) => (d.apr || 0) >= 18).map((d) => d.debt_id);
+        setSelectedTransferCards(highApr.length > 0 ? highApr : [debtList[0].debt_id]);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -134,7 +142,7 @@ export default function Strategies() {
         </div>
 
         {/* Sub-tab Navigation */}
-        <div className="flex items-center p-1 rounded-xl bg-slate-900/80 border border-white/10 text-xs self-start sm:self-auto">
+        <div className="flex flex-wrap items-center p-1 rounded-xl bg-slate-900/80 border border-white/10 text-xs self-start sm:self-auto gap-1">
           <button
             type="button"
             onClick={() => setSubTab("discover")}
@@ -158,6 +166,21 @@ export default function Strategies() {
           >
             <TableIcon className="w-3.5 h-3.5" />
             Compare Strategies
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab("transfer_radar")}
+            className={`px-4 py-2 rounded-lg font-medium transition flex items-center gap-1.5 ${
+              subTab === "transfer_radar"
+                ? "bg-blue-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            0% Transfer Radar
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+              Save $2k+
+            </span>
           </button>
         </div>
       </div>
@@ -276,6 +299,32 @@ export default function Strategies() {
           {/* ======================================================== */}
           {subTab === "discover" && (
             <div className="space-y-8 animate-fadeIn">
+              {/* 0% APR Opportunity Spotlight */}
+              {debts.some((d) => (d.apr || 0) >= 18) && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-950/40 via-slate-900/90 to-indigo-950/40 border border-blue-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/30 text-blue-400 flex items-center justify-center shrink-0">
+                      <Zap className="w-5 h-5 text-amber-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                        High APR Relief Opportunity Detected
+                      </div>
+                      <p className="text-xs text-slate-200 mt-0.5">
+                        You have cards with up to <strong className="text-white font-semibold">{Math.max(...debts.map((d) => d.apr || 0)).toFixed(1)}% APR</strong>. Moving them to a 0% intro balance transfer card could save you over <strong className="text-emerald-400 font-semibold">$2,000+ in compound interest</strong>.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSubTab("transfer_radar")}
+                    className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shrink-0 transition flex items-center gap-1.5 shadow-md shadow-blue-500/25"
+                  >
+                    Open 0% Transfer Radar &rarr;
+                  </button>
+                </div>
+              )}
+
               {/* Goal Selector */}
               <div className="glass rounded-xl p-4" data-testid="help-me-choose-card">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -775,6 +824,251 @@ export default function Strategies() {
               )}
             </div>
           )}
+
+          {/* ======================================================== */}
+          {/* TAB 3: 0% BALANCE TRANSFER RADAR VIEW */}
+          {/* ======================================================== */}
+          {subTab === "transfer_radar" && (() => {
+            const cardsToTransfer = debts.filter((d) => selectedTransferCards.includes(d.debt_id));
+            const totalTransferBal = cardsToTransfer.reduce((sum, d) => sum + (d.balance || 0), 0);
+            const avgSelectedApr =
+              totalTransferBal > 0
+                ? cardsToTransfer.reduce((sum, d) => sum + ((d.balance || 0) * (d.apr || 0)), 0) / totalTransferBal
+                : 22.5;
+
+            const oneTimeTransferFee = totalTransferBal * (transferFeePct / 100);
+            const totalTransferCost = totalTransferBal + oneTimeTransferFee;
+            const targetMonthlyPayment = promoMonths > 0 ? totalTransferCost / promoMonths : 0;
+            
+            const approxInterestWithoutTransfer =
+              totalTransferBal * (avgSelectedApr / 100) * (promoMonths / 12) * 0.72;
+            const netInterestSaved = Math.max(0, approxInterestWithoutTransfer - oneTimeTransferFee);
+
+            const toggleCard = (id) => {
+              setSelectedTransferCards((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+              );
+            };
+
+            return (
+              <div className="space-y-8 animate-fadeIn">
+                {/* Radar Header Bento */}
+                <div className="glass rounded-3xl p-6 sm:p-8 border border-blue-500/30 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+                    <div>
+                      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                        <Zap className="w-3.5 h-3.5" />
+                        0% APR Balance Transfer Optimizer
+                      </div>
+                      <h2 className="font-display text-2xl sm:text-3xl font-light text-white tracking-tight">
+                        Calculate Your 0% Transfer Savings
+                      </h2>
+                      <p className="text-slate-400 text-sm mt-1 max-w-2xl">
+                        Select high-interest cards to simulate moving them onto a 0% promotional intro APR card. Eliminating double-digit interest accelerates your debt-free date by months.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold">
+                        0%
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Promo Window</span>
+                        <span className="text-xs font-semibold text-emerald-300">{promoMonths} Months Zero Interest</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* Left: Card Selection (7 cols) */}
+                    <div className="lg:col-span-7 space-y-6">
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                            <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                            Select Cards to Transfer
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {selectedTransferCards.length} selected
+                          </span>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          {debts.map((d) => {
+                            const isSelected = selectedTransferCards.includes(d.debt_id);
+                            const annualInterest = ((d.balance || 0) * (d.apr || 0)) / 100;
+                            return (
+                              <div
+                                key={d.debt_id}
+                                onClick={() => toggleCard(d.debt_id)}
+                                className={`p-4 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                                  isSelected
+                                    ? "bg-blue-600/10 border-blue-500/40 shadow-sm"
+                                    : "bg-slate-900/40 border-white/5 hover:border-white/10 opacity-70"
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className={`w-5 h-5 rounded-md flex items-center justify-center text-xs transition ${
+                                      isSelected
+                                        ? "bg-blue-600 text-white"
+                                        : "border border-slate-600 text-transparent"
+                                    }`}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </div>
+                                  <div>
+                                    <div className="text-sm font-semibold text-white flex items-center gap-2">
+                                      {d.name}
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-mono">
+                                        {d.apr}% APR
+                                      </span>
+                                    </div>
+                                    <div className="text-xs text-slate-400 mt-0.5">
+                                      Min: {fmtMoney(d.min_payment || 0)}/mo &bull; Costing ~{fmtMoney(annualInterest)}/yr in interest
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-sm font-bold text-white font-mono">
+                                    {fmtMoney(d.balance)}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400">Balance</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Promo Duration and Fee Selectors */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+                            0% Promo Window
+                          </label>
+                          <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-slate-900/60 border border-white/10">
+                            {[12, 15, 18, 21].map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setPromoMonths(m)}
+                                className={`py-2 text-xs font-semibold rounded-lg transition ${
+                                  promoMonths === m
+                                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                                    : "text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {m} mo
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+                            Balance Transfer Fee
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-900/60 border border-white/10">
+                            {[3, 4, 5].map((fee) => (
+                              <button
+                                key={fee}
+                                type="button"
+                                onClick={() => setTransferFeePct(fee)}
+                                className={`py-2 text-xs font-semibold rounded-lg transition ${
+                                  transferFeePct === fee
+                                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                                    : "text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {fee}% Fee
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Transfer Blueprint Summary (5 cols) */}
+                    <div className="lg:col-span-5 flex flex-col justify-between p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 to-slate-950 border border-white/10">
+                      <div>
+                        <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                            Transfer Outcome
+                          </span>
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            0% APR for {promoMonths} Mo
+                          </span>
+                        </div>
+
+                        <div className="space-y-3.5 my-5">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400">Transferred Balances:</span>
+                            <span className="text-white font-mono font-semibold">{fmtMoney(totalTransferBal)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400">One-Time Fee ({transferFeePct}%):</span>
+                            <span className="text-slate-300 font-mono font-medium">+{fmtMoney(oneTimeTransferFee)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400">Total Transferred Debt:</span>
+                            <span className="text-white font-mono font-bold">{fmtMoney(totalTransferCost)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-slate-400">Avoided Future Interest:</span>
+                            <span className="text-red-400 font-mono line-through">{fmtMoney(approxInterestWithoutTransfer)}</span>
+                          </div>
+
+                          <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/15 to-emerald-600/5 border border-emerald-500/30">
+                            <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block">
+                              Net Interest Saved
+                            </span>
+                            <div className="font-display text-3xl font-bold text-emerald-300 tracking-tight mt-1">
+                              {fmtMoney(netInterestSaved)}
+                            </div>
+                            <span className="text-[11px] text-slate-300 mt-1 block">
+                              Cash remaining in your bank account instead of paying card issuers.
+                            </span>
+                          </div>
+
+                          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-blue-500/20">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                                  Required Monthly Payoff
+                                </span>
+                                <span className="font-display text-lg font-bold text-blue-400">
+                                  {fmtMoney(targetMonthlyPayment)}/mo
+                                </span>
+                              </div>
+                              <span className="text-xs text-slate-400 text-right">
+                                for {promoMonths} months<br />
+                                <strong className="text-emerald-400">100% Principal</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          toast.success(`0% Transfer plan configured for ${fmtMoney(totalTransferBal)}. Saved $${Math.round(netInterestSaved)} in interest!`);
+                        }}
+                        className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition"
+                      >
+                        <Check className="w-4 h-4" />
+                        Apply Transfer Blueprint to Strategy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </>
       )}
 

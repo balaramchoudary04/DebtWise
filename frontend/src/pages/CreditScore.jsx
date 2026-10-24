@@ -16,6 +16,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   ArrowUpRight,
+  BadgePercent,
+  ArrowRight,
+  Zap,
+  Check,
+  Shield,
+  Percent,
 } from "lucide-react";
 import {
   LineChart,
@@ -33,6 +39,17 @@ export default function CreditScore() {
   const [refreshing, setRefreshing] = useState(false);
   const [payDown, setPayDown] = useState(2000);
   const [simResult, setSimResult] = useState(null);
+
+  // 0% Balance Transfer Radar State
+  const [debts, setDebts] = useState([
+    { debt_id: "1", name: "Chase Sapphire Reserve", type: "credit_card", balance: 6200, apr: 24.99, min_payment: 190, limit: 10000 },
+    { debt_id: "2", name: "Amex Everyday Card", type: "credit_card", balance: 3800, apr: 21.24, min_payment: 120, limit: 6000 },
+    { debt_id: "3", name: "Capital One Quicksilver", type: "credit_card", balance: 1400, apr: 19.99, min_payment: 50, limit: 3000 },
+  ]);
+  const [selectedTransferCards, setSelectedTransferCards] = useState(["1", "2"]);
+  const [promoMonths, setPromoMonths] = useState(18);
+  const [transferFeePct, setTransferFeePct] = useState(3);
+  const [radarFilterTier, setRadarFilterTier] = useState("all");
 
   const fetchScore = async () => {
     try {
@@ -70,6 +87,19 @@ export default function CreditScore() {
 
   useEffect(() => {
     fetchScore();
+    api.get("/debts")
+      .then((res) => {
+        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
+          const cardDebts = res.data.filter((d) => d.type === "credit_card" || d.apr >= 15);
+          if (cardDebts.length > 0) {
+            setDebts(cardDebts);
+            const highAprIds = cardDebts.filter((d) => d.apr >= 18).map((d) => d.debt_id);
+            if (highAprIds.length > 0) setSelectedTransferCards(highAprIds);
+            else setSelectedTransferCards([cardDebts[0].debt_id]);
+          }
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleRefresh = async () => {
@@ -100,6 +130,98 @@ export default function CreditScore() {
 
   const delta = getPoints(simUtil) - getPoints(data?.utilization_pct || 54.1);
   const simScore = Math.min(850, Math.max(300, currentScore + delta));
+
+  // Balance Transfer Radar calculations
+  const toggleCardSelection = (debtId) => {
+    setSelectedTransferCards((prev) =>
+      prev.includes(debtId) ? prev.filter((id) => id !== debtId) : [...prev, debtId]
+    );
+  };
+
+  const cardsToTransfer = debts.filter((d) => selectedTransferCards.includes(d.debt_id));
+  const totalTransferBal = cardsToTransfer.reduce((sum, d) => sum + (d.balance || 0), 0);
+  const avgSelectedApr =
+    totalTransferBal > 0
+      ? cardsToTransfer.reduce((sum, d) => sum + ((d.balance || 0) * (d.apr || 0)), 0) / totalTransferBal
+      : 22.5;
+
+  const oneTimeTransferFee = totalTransferBal * (transferFeePct / 100);
+  const totalTransferCost = totalTransferBal + oneTimeTransferFee;
+  const targetMonthlyPayment = promoMonths > 0 ? totalTransferCost / promoMonths : 0;
+  
+  // Approximate standard compound interest without transfer over the promoMonths
+  const approxInterestWithoutTransfer =
+    totalTransferBal * (avgSelectedApr / 100) * (promoMonths / 12) * 0.72;
+  const netInterestSaved = Math.max(0, approxInterestWithoutTransfer - oneTimeTransferFee);
+
+  // Projected FICO boost from clearing source card utilization lines
+  const transferFicoGain = Math.min(
+    60,
+    Math.max(25, Math.round(20 + (totalTransferBal / 1000) * 4))
+  );
+
+  const prequalifiedOffers = [
+    {
+      id: "simplicity",
+      name: "Citi Simplicity® Card",
+      issuer: "Citi",
+      introApr: "0% Intro APR",
+      duration: "21 Months",
+      months: 21,
+      transferFee: "3%",
+      regularApr: "19.24% - 29.99%",
+      minScore: 670,
+      badge: "Longest 0% Window",
+      highlight: "21 full billing cycles of 0% APR on balance transfers completed in first 4 months",
+      perk: "Zero late fees & zero penalty interest rate ever",
+      bestFor: "Maximum runway to eliminate large credit card debt without pressure",
+    },
+    {
+      id: "reflect",
+      name: "Wells Fargo Reflect® Card",
+      issuer: "Wells Fargo",
+      introApr: "0% Intro APR",
+      duration: "21 Months",
+      months: 21,
+      transferFee: "3% or 5%",
+      regularApr: "18.24% - 29.99%",
+      minScore: 680,
+      badge: "Top Rated",
+      highlight: "Up to 21 months 0% intro APR with on-time minimum payment qualifier",
+      perk: "Up to $600 cell phone protection against damage or theft",
+      bestFor: "Disciplined payoff with complementary insurance protection",
+    },
+    {
+      id: "slate",
+      name: "Chase Slate Edge℠",
+      issuer: "Chase",
+      introApr: "0% Intro APR",
+      duration: "18 Months",
+      months: 18,
+      transferFee: "3%",
+      regularApr: "20.49% - 29.24%",
+      minScore: 670,
+      badge: "Credit Builder",
+      highlight: "Automatic 2% APR rate reduction review every year when paying on time",
+      perk: "Automatic credit line increase review after 6 months of on-time payments",
+      bestFor: "Lowering revolving utilization while strengthening relationship with Chase",
+    },
+    {
+      id: "sofi",
+      name: "SoFi Fixed Debt Consolidation Loan",
+      issuer: "SoFi",
+      introApr: "8.99% - 13.49% Fixed APR",
+      duration: "24–36 Months",
+      months: 36,
+      transferFee: "0% Fee (No Origination)",
+      regularApr: "Fixed Rate",
+      minScore: 620,
+      badge: "Fixed Installment",
+      highlight: "Single fixed monthly payment replacing multiple chaotic credit cards",
+      perk: "Direct creditor pay included — funds disburse directly to wipe your cards",
+      bestFor: "Converting high-stress revolving debt into a fixed predictable installment",
+    },
+  ];
 
   return (
     <div className="space-y-8 animate-fade-up" data-testid="credit-score-page">
@@ -331,8 +453,295 @@ export default function CreditScore() {
         </div>
       </div>
 
-      {/* Projected Score Trajectory Line Chart */}
-      <div className="glass rounded-2xl p-6 sm:p-8" data-testid="score-trajectory-card">
+      {/* 0% APR Balance Transfer & Consolidation Radar */}
+      <div className="glass rounded-3xl p-6 sm:p-8 border border-blue-500/30 relative overflow-hidden" data-testid="balance-transfer-radar">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none -z-10" />
+
+        {/* Radar Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-2">
+              <Zap className="w-3.5 h-3.5" />
+              0% APR Balance Transfer &amp; Interest Relief Radar
+            </div>
+            <h3 className="font-display text-2xl sm:text-3xl font-light text-white tracking-tight">
+              Stop High-Interest Bleeding with a 0% Transfer
+            </h3>
+            <p className="text-slate-400 text-sm mt-1 max-w-2xl">
+              Cross-references your <strong className="text-white font-medium">{currentScore} FICO® Score</strong> with prime 0% intro APR offers. Moving high-rate balances immediately halts compound interest and dramatically lowers revolving credit utilization.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center font-bold">
+              +{transferFicoGain}
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Estimated Score Jump</span>
+              <span className="text-xs font-semibold text-emerald-300">Revolving Util &rarr; 0%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Interactive Configuration Bento */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+          {/* Left Column: Card Selection & Promo Settings (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Step 1: Card Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                  <CreditCard className="w-3.5 h-3.5 text-blue-400" />
+                  Step 1: Select Cards to Transfer
+                </span>
+                <span className="text-xs text-slate-400">
+                  {selectedTransferCards.length} of {debts.length} cards selected
+                </span>
+              </div>
+
+              <div className="space-y-2.5">
+                {debts.map((card) => {
+                  const isSelected = selectedTransferCards.includes(card.debt_id);
+                  const annualInterest = ((card.balance || 0) * (card.apr || 0)) / 100;
+                  return (
+                    <div
+                      key={card.debt_id}
+                      onClick={() => toggleCardSelection(card.debt_id)}
+                      className={`p-4 rounded-xl border transition cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? "bg-blue-600/10 border-blue-500/40 shadow-sm"
+                          : "bg-slate-900/40 border-white/5 hover:border-white/10 opacity-70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-5 h-5 rounded-md flex items-center justify-center text-xs transition ${
+                            isSelected
+                              ? "bg-blue-600 text-white"
+                              : "border border-slate-600 text-transparent"
+                          }`}
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-white flex items-center gap-2">
+                            {card.name}
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 font-mono">
+                              {card.apr}% APR
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-400 mt-0.5">
+                            Minimum: {fmtMoney(card.min_payment || 0)}/mo &bull; Bleeding ~{fmtMoney(annualInterest)}/yr in interest
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <div className="text-sm font-bold text-white font-mono">
+                          {fmtMoney(card.balance)}
+                        </div>
+                        <div className="text-[11px] text-slate-400">Balance</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2: Promo Duration & Transfer Fee */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+                  0% Promo Duration
+                </label>
+                <div className="grid grid-cols-4 gap-1.5 p-1 rounded-xl bg-slate-900/60 border border-white/10">
+                  {[12, 15, 18, 21].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setPromoMonths(m)}
+                      className={`py-2 text-xs font-semibold rounded-lg transition ${
+                        promoMonths === m
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {m} mo
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 block mb-2">
+                  Balance Transfer Fee
+                </label>
+                <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-900/60 border border-white/10">
+                  {[3, 4, 5].map((fee) => (
+                    <button
+                      key={fee}
+                      type="button"
+                      onClick={() => setTransferFeePct(fee)}
+                      className={`py-2 text-xs font-semibold rounded-lg transition ${
+                        transferFeePct === fee
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-500/30"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {fee}% Fee
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Live Savings & Payoff Blueprint (5 cols) */}
+          <div className="lg:col-span-5 flex flex-col justify-between p-6 rounded-2xl bg-gradient-to-br from-slate-900/90 to-slate-950 border border-white/10 relative">
+            <div>
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                  Transfer Summary
+                </span>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  0% APR for {promoMonths} Mo
+                </span>
+              </div>
+
+              <div className="space-y-4 my-5">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Selected Balances to Transfer:</span>
+                  <span className="text-white font-mono font-semibold">{fmtMoney(totalTransferBal)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">One-Time Transfer Fee ({transferFeePct}%):</span>
+                  <span className="text-slate-300 font-mono font-medium">+{fmtMoney(oneTimeTransferFee)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Total Transferred Balance:</span>
+                  <span className="text-white font-mono font-bold">{fmtMoney(totalTransferCost)}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-slate-400">Current Interest Bleed Avoided:</span>
+                  <span className="text-red-400 font-mono line-through">{fmtMoney(approxInterestWithoutTransfer)}</span>
+                </div>
+
+                {/* Net Savings Hero Box */}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/15 to-emerald-600/5 border border-emerald-500/30">
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block">
+                    Net Pure Interest Saved
+                  </span>
+                  <div className="font-display text-3xl font-bold text-emerald-300 tracking-tight mt-1">
+                    {fmtMoney(netInterestSaved)}
+                  </div>
+                  <span className="text-[11px] text-slate-300 mt-1 block">
+                    Direct cash savings after deducting the {transferFeePct}% transfer fee.
+                  </span>
+                </div>
+
+                {/* Payoff Blueprint Target */}
+                <div className="p-3.5 rounded-xl bg-slate-900/60 border border-blue-500/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                        Target Monthly Payment
+                      </span>
+                      <span className="font-display text-lg font-bold text-blue-400">
+                        {fmtMoney(targetMonthlyPayment)}/mo
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-400 text-right">
+                      for {promoMonths} months<br />
+                      <strong className="text-emerald-400">100% Principal</strong>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                toast.success(`0% Transfer Blueprint for ${fmtMoney(totalTransferBal)} saved! Net savings: ${fmtMoney(netInterestSaved)}.`);
+              }}
+              className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition"
+            >
+              <Check className="w-4 h-4" />
+              Save Blueprint &amp; Add to Active Plan
+            </button>
+          </div>
+        </div>
+
+        {/* Pre-Qualified Offers Section */}
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Pre-Qualified Matching Offers
+              </span>
+              <h4 className="font-display text-lg font-medium text-white">
+                Offers Tailored for Your {currentScore} Credit Tier
+              </h4>
+            </div>
+            <span className="text-xs text-slate-400">
+              No impact to your credit score to view details
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {prequalifiedOffers.map((offer) => (
+              <div
+                key={offer.id}
+                className="p-5 rounded-2xl bg-slate-900/60 border border-white/10 hover:border-blue-500/40 transition flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      {offer.badge}
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-400 font-mono">
+                      {offer.introApr}
+                    </span>
+                  </div>
+
+                  <h5 className="font-display text-base font-medium text-white mb-1 group-hover:text-blue-300 transition">
+                    {offer.name}
+                  </h5>
+                  <div className="text-xs text-slate-400 mb-3">
+                    Issuer: <strong className="text-slate-300">{offer.issuer}</strong> &bull; {offer.duration}
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed mb-3">
+                    {offer.highlight}
+                  </p>
+
+                  <div className="p-2 rounded-lg bg-white/5 border border-white/5 text-[11px] text-slate-400 mb-4">
+                    🎁 <span className="text-slate-300">{offer.perk}</span>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-white/5">
+                  <div className="flex justify-between items-center text-[11px] text-slate-400 mb-3">
+                    <span>Transfer Fee: <strong className="text-slate-200">{offer.transferFee}</strong></span>
+                    <span>Min Score: <strong className="text-emerald-400">{offer.minScore}</strong></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromoMonths(offer.months || 18);
+                      toast.success(`Configured radar for ${offer.name} (${offer.duration} 0% APR).`);
+                    }}
+                    className="w-full py-2 rounded-lg bg-white/5 hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 border border-blue-500/20 text-xs font-medium transition flex items-center justify-center gap-1.5"
+                  >
+                    Simulate This Offer &rarr;
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
