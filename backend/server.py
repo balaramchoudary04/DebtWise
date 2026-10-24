@@ -1406,6 +1406,25 @@ async def update_profile(payload: ProfileUpdatePayload, user: dict = Depends(get
     return UserPublic(**refreshed).model_dump()
 
 
+class DashboardLayoutPayload(BaseModel):
+    layout: List[dict]
+
+
+@api_router.get("/user/dashboard-layout")
+async def get_dashboard_layout(user: dict = Depends(get_current_user)):
+    user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "dashboard_layout": 1})
+    return {"layout": user_doc.get("dashboard_layout") if user_doc else None}
+
+
+@api_router.put("/user/dashboard-layout")
+async def update_dashboard_layout(payload: DashboardLayoutPayload, user: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"dashboard_layout": payload.layout}}
+    )
+    return {"success": True, "layout": payload.layout}
+
+
 @api_router.get("/subscription/plans")
 async def subscription_plans():
     return {
