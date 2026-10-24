@@ -144,6 +144,7 @@ from plaid.model.country_code import CountryCode
 from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
 from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid.model.liabilities_get_request import LiabilitiesGetRequest
+from plaid.model.transactions_sync_request import TransactionsSyncRequest
 
 # ============================================================
 # Setup
@@ -1950,6 +1951,103 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
             except Exception:
                 pass
 
+    # Pull checking account transactions via Plaid transactions_sync for 2-way cross-account matching
+    try:
+        sync_req = TransactionsSyncRequest(
+            access_token=access_token,
+            count=100,
+        )
+        tx_resp = await asyncio.to_thread(client.transactions_sync, sync_req)
+        tx_dict = tx_resp.to_dict() if hasattr(tx_resp, "to_dict") else tx_resp
+        added_txns = tx_dict.get("added") or []
+        next_cursor = tx_dict.get("next_cursor")
+
+        if next_cursor:
+            await db.plaid_items.update_one(
+                {"user_id": user["user_id"], "item_id": item["item_id"]},
+                {"$set": {"transactions_cursor": next_cursor}},
+            )
+
+        user_debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=100)
+
+        for tx in added_txns:
+            tx_amount = float(tx.get("amount") or 0)
+            tx_name = str(tx.get("name") or "")
+            tx_categories = tx.get("category") or []
+            tx_pfc = str(tx.get("personal_finance_category", {}).get("primary", "") if isinstance(tx.get("personal_finance_category"), dict) else getattr(tx.get("personal_finance_category"), "primary", "") or "")
+
+            is_transfer = (
+                "Transfer" in tx_categories
+                or "Credit Card Payment" in tx_categories
+                or "Payment" in tx_categories
+                or "LOAN_PAYMENTS" in tx_pfc
+                or "credit card" in tx_name.lower()
+                or "autopay" in tx_name.lower()
+                or "epay" in tx_name.lower()
+                or "payment thank you" in tx_name.lower()
+            )
+
+            matched_debt = None
+            if is_transfer:
+                for d in user_debts:
+                    d_name_words = [w.lower() for w in d["name"].split() if len(w) > 3]
+                    if any(w in tx_name.lower() for w in d_name_words):
+                        matched_debt = d
+                        break
+
+            is_internal_debt_transfer = bool(is_transfer and (matched_debt or "credit card" in tx_name.lower()))
+            is_spending = not is_internal_debt_transfer and tx_amount > 0
+
+            await db.transactions.update_one(
+                {"user_id": user["user_id"], "transaction_id": tx["transaction_id"]},
+                {"$set": {
+                    "user_id": user["user_id"],
+                    "transaction_id": tx["transaction_id"],
+                    "account_id": tx["account_id"],
+                    "account_name": by_account.get(tx["account_id"], {}).get("name", "Checking Account"),
+                    "amount": tx_amount,
+                    "date": str(tx.get("date")),
+                    "name": tx_name,
+                    "merchant_name": tx.get("merchant_name"),
+                    "category": tx_categories,
+                    "is_internal_transfer": is_internal_debt_transfer,
+                    "is_spending": is_spending,
+                    "matched_debt_id": matched_debt["debt_id"] if matched_debt else None,
+                    "matched_debt_name": matched_debt["name"] if matched_debt else None,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }},
+                upsert=True,
+            )
+
+            if is_internal_debt_transfer and matched_debt and tx_amount > 0:
+                try:
+                    tx_dt = datetime.fromisoformat(str(tx.get("date"))).date()
+                    chk_name = by_account.get(tx["account_id"], {}).get("name", "Chase Checking")
+                    await db.payment_logs.update_one(
+                        {"user_id": user["user_id"], "debt_id": matched_debt["debt_id"], "year": tx_dt.year, "month": tx_dt.month},
+                        {"$set": {
+                            "user_id": user["user_id"],
+                            "debt_id": matched_debt["debt_id"],
+                            "year": tx_dt.year,
+                            "month": tx_dt.month,
+                            "is_paid": True,
+                            "auto_detected": True,
+                            "source": "plaid_internal_transfer",
+                            "matched_from_account": chk_name,
+                            "is_internal_transfer": True,
+                            "is_spending": False,
+                            "detected_amount": tx_amount,
+                            "detected_date": str(tx.get("date")),
+                            "detected_desc": f"Payment Reconciled: {chk_name} ➔ {matched_debt['name']}",
+                            "paid_at": datetime.now(timezone.utc).isoformat(),
+                        }},
+                        upsert=True,
+                    )
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.info(f"Plaid transactions sync (depository) skipped: {e}")
+
     await db.plaid_items.update_one(
         {"user_id": user["user_id"], "item_id": item["item_id"]},
         {"$set": {"last_sync_at": datetime.now(timezone.utc).isoformat(), "imported_count": imported}},
@@ -1987,6 +2085,26 @@ async def plaid_reconcile_transfers(user: dict = Depends(get_current_user)):
         "monitored_checking_accounts": len(checking_accounts),
         "reconciled_payments_this_month": len(reconciled_logs),
         "reconciled_events": reconciled_logs,
+    }
+
+
+@api_router.get("/transactions/spending-summary")
+async def get_spending_summary(user: dict = Depends(get_current_user)):
+    """Returns actual spending strictly excluding debt payoff transfers to prevent double counting."""
+    txns = await db.transactions.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=1000)
+
+    living_spending = [t for t in txns if t.get("is_spending")]
+    debt_transfers = [t for t in txns if t.get("is_internal_transfer")]
+
+    total_living_expenses = sum(t.get("amount", 0) for t in living_spending if t.get("amount", 0) > 0)
+    total_debt_payments = sum(t.get("amount", 0) for t in debt_transfers if t.get("amount", 0) > 0)
+
+    return {
+        "total_true_spending": round(total_living_expenses, 2),
+        "total_debt_payments_reconciled": round(total_debt_payments, 2),
+        "avoided_double_counting_amount": round(total_debt_payments, 2),
+        "living_transactions_count": len(living_spending),
+        "reconciled_transfers_count": len(debt_transfers),
     }
 
 
@@ -2033,6 +2151,9 @@ async def startup():
     await db.reminder_log.create_index("key", unique=True)
     await db.plaid_items.create_index([("user_id", 1), ("item_id", 1)], unique=True)
     await db.debts.create_index([("user_id", 1), ("plaid_account_id", 1)])
+    await db.transactions.create_index([("user_id", 1), ("transaction_id", 1)], unique=True)
+    await db.transactions.create_index([("user_id", 1), ("is_spending", 1)])
+    await db.connected_accounts.create_index([("user_id", 1), ("plaid_account_id", 1)], unique=True)
     # Seed admin
     admin_email = os.environ.get("ADMIN_EMAIL", "admin@debtwise.app").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@123")
