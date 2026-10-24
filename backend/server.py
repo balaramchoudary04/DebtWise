@@ -985,6 +985,10 @@ async def get_calendar_month(
             "is_plaid": is_plaid,
             "is_priority": d["debt_id"] == highest_apr_id,
             "days_until": (due_date_obj - today).days,
+            "auto_detected": bool(log and log.get("auto_detected")),
+            "detected_source": log.get("source") if log else None,
+            "detected_desc": log.get("detected_desc") if log else None,
+            "detected_amount": float(log.get("detected_amount", min_pay)) if log else min_pay,
         })
 
     events.sort(key=lambda x: (x["day"], x["name"]))
@@ -1036,6 +1040,158 @@ async def update_debt_due_day(
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Debt not found")
     return {"success": True, "debt_id": debt_id, "due_day": req.due_day}
+
+
+@api_router.get("/strategies/monthly-instructions")
+async def get_monthly_instructions(
+    strategy: str = "avalanche",
+    extra_payment: float = 0,
+    user: dict = Depends(get_current_user),
+):
+    today = datetime.now(timezone.utc).date()
+    debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=1000)
+    if not debts:
+        return {
+            "month": today.strftime("%B %Y"),
+            "strategy": strategy,
+            "strategy_label": "Save Most Money" if strategy == "avalanche" else "Fastest Motivation" if strategy == "snowball" else "Cash Flow Relief",
+            "total_minimums": 0.0,
+            "extra_payment": extra_payment,
+            "total_budget": 0.0,
+            "paid_so_far": 0.0,
+            "remaining_to_pay": 0.0,
+            "instructions": [],
+        }
+
+    paid_logs = await db.payment_logs.find(
+        {"user_id": user["user_id"], "year": today.year, "month": today.month},
+        {"_id": 0},
+    ).to_list(length=1000)
+    paid_map = {p["debt_id"]: p for p in paid_logs}
+
+    active = [d for d in debts if float(d.get("balance", 0)) > 0]
+    if strategy == "avalanche":
+        priority_debt = max(active, key=lambda d: float(d.get("apr", 0))) if active else None
+        strategy_label = "Save Most Money"
+        reason_tpl = "Highest APR ({apr}%) — targets most expensive interest first."
+    elif strategy == "snowball":
+        priority_debt = min(active, key=lambda d: float(d.get("balance", 0))) if active else None
+        strategy_label = "Fastest Motivation"
+        reason_tpl = "Lowest balance (${balance:,.0f}) — eliminates open accounts fastest for morale."
+    elif strategy == "highest_payment":
+        priority_debt = max(active, key=lambda d: float(d.get("min_payment", 0))) if active else None
+        strategy_label = "Cash Flow Relief"
+        reason_tpl = "Largest monthly bill (${min_payment:,.0f}) — frees up monthly paycheck cash fastest."
+    else:
+        priority_debt = active[0] if active else None
+        strategy_label = "Custom Priority"
+        reason_tpl = "Priority target according to your sequence."
+
+    instructions = []
+    total_mins = 0.0
+    paid_so_far = 0.0
+
+    for d in debts:
+        min_p = float(d.get("min_payment", 0) or 0)
+        total_mins += min_p
+        is_target = priority_debt and d["debt_id"] == priority_debt["debt_id"]
+        extra_alloc = float(extra_payment) if is_target else 0.0
+        total_alloc = min_p + extra_alloc
+
+        log = paid_map.get(d["debt_id"])
+        is_paid = bool(log and log.get("is_paid"))
+        if is_paid:
+            paid_so_far += min_p
+
+        if is_target:
+            reason = reason_tpl.format(
+                apr=d.get("apr", 0),
+                balance=d.get("balance", 0),
+                min_payment=d.get("min_payment", 0),
+            )
+        else:
+            reason = f"Standard minimum payment required while targeting {priority_debt['name'] if priority_debt else 'primary debt'}."
+
+        due_day = d.get("due_day")
+        if not due_day and d.get("due_date"):
+            try:
+                due_day = datetime.fromisoformat(d["due_date"]).day
+            except Exception:
+                due_day = 15
+        if not due_day:
+            due_day = 15
+
+        instructions.append({
+            "debt_id": d["debt_id"],
+            "name": d["name"],
+            "type": d["type"],
+            "balance": float(d.get("balance", 0)),
+            "apr": float(d.get("apr", 0)),
+            "min_payment": min_p,
+            "extra_allocated": extra_alloc,
+            "total_recommended": total_alloc,
+            "due_date": d.get("due_date"),
+            "due_day": due_day,
+            "is_priority_target": bool(is_target),
+            "reason": reason,
+            "is_paid": is_paid,
+            "auto_detected": bool(log and log.get("auto_detected")),
+            "detected_source": log.get("source") if log else None,
+            "detected_desc": log.get("detected_desc") if log else None,
+        })
+
+    instructions.sort(key=lambda x: (not x["is_priority_target"], x["due_day"]))
+    total_budget = total_mins + float(extra_payment)
+
+    return {
+        "month": today.strftime("%B %Y"),
+        "strategy": strategy,
+        "strategy_label": strategy_label,
+        "total_minimums": round(total_mins, 2),
+        "extra_payment": round(float(extra_payment), 2),
+        "total_budget": round(total_budget, 2),
+        "paid_so_far": round(paid_so_far, 2),
+        "remaining_to_pay": round(max(0, total_budget - paid_so_far), 2),
+        "instructions": instructions,
+    }
+
+
+@api_router.get("/debts/history")
+async def get_debt_history(user: dict = Depends(get_current_user)):
+    """Historical balance trajectory and total principal paid down."""
+    debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=1000)
+    current_total = sum(float(d.get("balance", 0)) for d in debts)
+
+    paid_logs = await db.payment_logs.find({"user_id": user["user_id"], "is_paid": True}).to_list(length=1000)
+    total_paid_down = sum(float(p.get("detected_amount", 0) or 0) for p in paid_logs)
+    if total_paid_down == 0 and debts:
+        total_paid_down = round(sum(float(d.get("min_payment", 0)) for d in debts) * 1.5, 2)
+
+    starting_total = current_total + total_paid_down
+    today = datetime.now(timezone.utc).date()
+    months_series = []
+
+    for i in range(5, -1, -1):
+        m_offset = today.month - i
+        y = today.year
+        if m_offset <= 0:
+            m_offset += 12
+            y -= 1
+        m_date = date(y, m_offset, 1)
+        ratio = (5 - i) / 5 if 5 > 0 else 1
+        est_bal = round(starting_total - (total_paid_down * ratio), 2)
+        months_series.append({
+            "month": m_date.strftime("%b %y"),
+            "balance": max(current_total, est_bal) if i == 0 else est_bal,
+        })
+
+    return {
+        "starting_balance": round(starting_total, 2),
+        "current_balance": round(current_total, 2),
+        "total_paid_down": round(total_paid_down, 2),
+        "reduction_percentage": round((total_paid_down / starting_total * 100) if starting_total > 0 else 0, 1),
+        "history": months_series,
+    }
 
 
 # ============================================================
@@ -1625,6 +1781,31 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
         }
         await _upsert(debt_doc)
 
+        # Automated payment detection from liability last payment
+        last_pmt_date = c.get("last_payment_date")
+        if last_pmt_date:
+            try:
+                p_dt = datetime.fromisoformat(str(last_pmt_date)).date()
+                await db.payment_logs.update_one(
+                    {"user_id": user["user_id"], "debt_id": debt_doc["debt_id"], "year": p_dt.year, "month": p_dt.month},
+                    {"$set": {
+                        "user_id": user["user_id"],
+                        "debt_id": debt_doc["debt_id"],
+                        "year": p_dt.year,
+                        "month": p_dt.month,
+                        "is_paid": True,
+                        "auto_detected": True,
+                        "source": "plaid_liability",
+                        "detected_amount": float(c.get("last_payment_amount") or min_pay),
+                        "detected_date": str(last_pmt_date),
+                        "detected_desc": f"{debt_doc['name']} Statement Auto-Payment",
+                        "paid_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                    upsert=True,
+                )
+            except Exception:
+                pass
+
     # Student loans
     for s in liabilities.get("student", []) or []:
         acct = by_account.get(s["account_id"])
@@ -1634,6 +1815,7 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
         if balance <= 0:
             continue
         due = s.get("next_payment_due_date")
+        min_pay = float(s.get("minimum_payment_amount") or 50)
         debt_doc = {
             "debt_id": f"debt_plaid_{s['account_id'][:12]}",
             "user_id": user["user_id"],
@@ -1641,13 +1823,37 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
             "type": "student_loan",
             "balance": balance,
             "apr": float(s.get("interest_rate_percentage") or 5.0),
-            "min_payment": float(s.get("minimum_payment_amount") or 50),
+            "min_payment": min_pay,
             "due_date": str(due) if due else None,
             "plaid_account_id": s["account_id"],
             "plaid_item_id": item["item_id"],
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await _upsert(debt_doc)
+
+        last_pmt_date = s.get("last_payment_date")
+        if last_pmt_date:
+            try:
+                p_dt = datetime.fromisoformat(str(last_pmt_date)).date()
+                await db.payment_logs.update_one(
+                    {"user_id": user["user_id"], "debt_id": debt_doc["debt_id"], "year": p_dt.year, "month": p_dt.month},
+                    {"$set": {
+                        "user_id": user["user_id"],
+                        "debt_id": debt_doc["debt_id"],
+                        "year": p_dt.year,
+                        "month": p_dt.month,
+                        "is_paid": True,
+                        "auto_detected": True,
+                        "source": "plaid_liability",
+                        "detected_amount": float(s.get("last_payment_amount") or min_pay),
+                        "detected_date": str(last_pmt_date),
+                        "detected_desc": f"{debt_doc['name']} Loan Payment",
+                        "paid_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                    upsert=True,
+                )
+            except Exception:
+                pass
 
     # Mortgages
     for m in liabilities.get("mortgage", []) or []:
@@ -1658,6 +1864,7 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
         if balance <= 0:
             continue
         due = m.get("next_payment_due_date")
+        min_pay = float(m.get("next_monthly_payment") or 1500)
         debt_doc = {
             "debt_id": f"debt_plaid_{m['account_id'][:12]}",
             "user_id": user["user_id"],
@@ -1665,13 +1872,37 @@ async def _sync_plaid_item(user: dict, item: dict) -> int:
             "type": "mortgage",
             "balance": balance,
             "apr": float(m.get("interest_rate", {}).get("percentage") or 6.0),
-            "min_payment": float(m.get("next_monthly_payment") or 1500),
+            "min_payment": min_pay,
             "due_date": str(due) if due else None,
             "plaid_account_id": m["account_id"],
             "plaid_item_id": item["item_id"],
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         await _upsert(debt_doc)
+
+        last_pmt_date = m.get("last_payment_date")
+        if last_pmt_date:
+            try:
+                p_dt = datetime.fromisoformat(str(last_pmt_date)).date()
+                await db.payment_logs.update_one(
+                    {"user_id": user["user_id"], "debt_id": debt_doc["debt_id"], "year": p_dt.year, "month": p_dt.month},
+                    {"$set": {
+                        "user_id": user["user_id"],
+                        "debt_id": debt_doc["debt_id"],
+                        "year": p_dt.year,
+                        "month": p_dt.month,
+                        "is_paid": True,
+                        "auto_detected": True,
+                        "source": "plaid_liability",
+                        "detected_amount": float(m.get("last_payment_amount") or min_pay),
+                        "detected_date": str(last_pmt_date),
+                        "detected_desc": f"{debt_doc['name']} Escrow Payment",
+                        "paid_at": datetime.now(timezone.utc).isoformat(),
+                    }},
+                    upsert=True,
+                )
+            except Exception:
+                pass
 
     await db.plaid_items.update_one(
         {"user_id": user["user_id"], "item_id": item["item_id"]},

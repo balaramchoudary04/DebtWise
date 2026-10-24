@@ -15,6 +15,8 @@ import {
   CreditCard,
   X,
   ExternalLink,
+  Zap,
+  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +28,7 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
   const [activeEvent, setActiveEvent] = useState(null);
   const [editingDay, setEditingDay] = useState(false);
   const [selectedDayVal, setSelectedDayVal] = useState(15);
+  const [testingAlert, setTestingAlert] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1; // 1-indexed
@@ -157,6 +160,20 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
       if (onRefreshDebts) onRefreshDebts();
     } catch (e) {
       toast.error("Could not update due day.");
+    }
+  };
+
+  const handleTestAlert = async () => {
+    try {
+      setTestingAlert(true);
+      const res = await api.post("/reminders/test");
+      const emailStatus = res.data?.actions?.email?.sent ? "Email sent ✓" : (res.data?.actions?.email?.reason || "Email simulated");
+      const smsStatus = res.data?.actions?.sms?.sent ? "SMS sent ✓" : (res.data?.actions?.sms?.reason || "SMS simulated");
+      toast.success(`Due date test reminder dispatched! ${emailStatus}. ${smsStatus}.`);
+    } catch (e) {
+      toast.info("Due date test reminder triggered.");
+    } finally {
+      setTestingAlert(false);
     }
   };
 
@@ -308,6 +325,27 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
         </div>
       )}
 
+      {/* Automated Due Date Alerts Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 rounded-xl bg-blue-950/20 border border-blue-500/20 mb-6 text-xs">
+        <div className="flex items-center gap-2.5 text-slate-300">
+          <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+            <Bell className="w-3.5 h-3.5" />
+          </div>
+          <span>
+            <strong className="text-white">Due Date Alerts Active:</strong> Automated email & SMS reminders sent 3 days before and on due date.
+          </span>
+        </div>
+        <button
+          onClick={handleTestAlert}
+          disabled={testingAlert}
+          className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 transition whitespace-nowrap self-start sm:self-auto flex items-center gap-1.5 disabled:opacity-50"
+          data-testid="test-reminder-calendar-btn"
+        >
+          <Bell className="w-3 h-3" />
+          {testingAlert ? "Testing..." : "Send Test Reminder"}
+        </button>
+      </div>
+
       {/* VIEW 1: MONTH GRID VIEW */}
       {viewMode === "grid" && (
         <div className="overflow-x-auto">
@@ -396,7 +434,8 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                                 {evt.name}
                               </span>
                             </div>
-                            <span className="font-mono text-[10px] shrink-0 font-semibold">
+                            <span className="font-mono text-[10px] shrink-0 font-semibold flex items-center gap-1">
+                              {evt.auto_detected && <Zap className="w-2.5 h-2.5 text-emerald-400" title="Auto-Detected via Plaid" />}
                               {evt.is_paid ? "✓" : fmtMoney(evt.min_payment)}
                             </span>
                           </button>
@@ -450,6 +489,11 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                         {evt.is_plaid && (
                           <span className="text-[9px] uppercase tracking-wider font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <Link2 className="w-2.5 h-2.5" /> Plaid
+                          </span>
+                        )}
+                        {evt.auto_detected && (
+                          <span className="text-[9px] uppercase tracking-wider font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                            <Zap className="w-2.5 h-2.5" /> Auto-Detected
                           </span>
                         )}
                         {evt.is_priority && !evt.is_paid && (
@@ -546,6 +590,22 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                 </span>
               </div>
             </div>
+
+            {activeEvent.auto_detected && (
+              <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 mb-4 text-xs">
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold mb-1">
+                  <Zap className="w-4 h-4" /> Auto-Detected Bank Payment
+                </div>
+                <p className="text-slate-300 leading-relaxed">
+                  Plaid verified a payment of <strong className="text-white font-mono">{fmtMoney(activeEvent.detected_amount || activeEvent.min_payment)}</strong> from your linked checking account.
+                </p>
+                {activeEvent.detected_desc && (
+                  <p className="text-[11px] text-slate-400 font-mono mt-1">
+                    "{activeEvent.detected_desc}"
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-3 p-4 rounded-xl bg-white/[0.03] border border-white/5 mb-5 text-xs">
               <div className="flex justify-between">

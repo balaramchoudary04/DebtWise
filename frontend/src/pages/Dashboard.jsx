@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import PaymentCalendar from "../components/PaymentCalendar";
+import MonthlyPaymentInstructions from "../components/MonthlyPaymentInstructions";
+import DebtProgressHistory from "../components/DebtProgressHistory";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -390,6 +392,13 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Exact Monthly Payment Instructions ("What to pay this month") */}
+        <MonthlyPaymentInstructions
+          debts={debts}
+          strategy="avalanche"
+          extra={100}
+        />
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10">
           {/* Breakdown */}
           <div className="glass rounded-2xl p-6 lg:col-span-1" data-testid="card-breakdown">
@@ -487,6 +496,9 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Debt Payoff Progress & Remaining Balance History */}
+        <DebtProgressHistory debts={debts} />
 
         {/* Payoff Pipeline Progression */}
         <div className="glass rounded-2xl p-6 mb-10 animate-fade-up delay-200" data-testid="card-payoff-pipeline">
