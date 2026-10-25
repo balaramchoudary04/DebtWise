@@ -23,6 +23,7 @@ import {
   Building2,
   Zap,
   RefreshCw,
+  Calculator,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -176,6 +177,39 @@ export default function AppLayout() {
             <div>
               <span className="font-medium text-white block">Connected Accounts</span>
               <span className="text-[10px] text-slate-400 block">Chase Checking, Credit Cards &amp; Loans</span>
+            </div>
+          </div>
+          <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition" />
+        </button>
+
+        {/* Spend Calculator & Budget Planner */}
+        <button
+          type="button"
+          onClick={() => {
+            closeMenu();
+            navigate("/dashboard#spend-budget-planner");
+            setTimeout(() => {
+              const el = document.getElementById("spend-budget-planner");
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }, 100);
+          }}
+          className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-white/10 text-slate-300 hover:text-white transition group text-left"
+          data-testid="dropdown-budget-btn"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 flex items-center justify-center group-hover:scale-105 transition">
+              <Calculator className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-white block">Spend Calculator &amp; Budget</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300">
+                  New
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-400 block">Cash flow, 50/30/20 &amp; surplus simulator</span>
             </div>
           </div>
           <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-slate-300 transition" />

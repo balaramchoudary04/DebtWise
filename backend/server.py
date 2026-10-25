@@ -1426,6 +1426,62 @@ async def update_dashboard_layout(payload: DashboardLayoutPayload, user: dict = 
     return {"success": True, "layout": payload.layout}
 
 
+class BudgetPlannerPayload(BaseModel):
+    monthly_income: float = 5200.0
+    pay_frequency: str = "monthly"
+    needs: List[dict] = []
+    wants: List[dict] = []
+    custom_cuts: Dict[str, float] = {}
+    extra_to_debt: float = 0.0
+
+
+@api_router.get("/user/budget-planner")
+async def get_budget_planner(user: dict = Depends(get_current_user)):
+    user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "budget_planner": 1})
+    debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=100)
+    debt_minimums = sum(float(d.get("min_payment", 0) or 0) for d in debts)
+
+    saved = user_doc.get("budget_planner") if user_doc else None
+    default_needs = [
+        {"id": "housing", "name": "Housing / Rent / Mortgage", "amount": 1650.0, "category": "need"},
+        {"id": "groceries", "name": "Groceries & Supermarket", "amount": 520.0, "category": "need"},
+        {"id": "utilities", "name": "Utilities & Internet", "amount": 240.0, "category": "need"},
+        {"id": "transportation", "name": "Transportation & Gas", "amount": 380.0, "category": "need"},
+        {"id": "healthcare", "name": "Healthcare & Insurance", "amount": 160.0, "category": "need"},
+    ]
+    default_wants = [
+        {"id": "dining", "name": "Dining Out & Takeout", "amount": 310.0, "category": "want", "max_cut": 200.0},
+        {"id": "entertainment", "name": "Entertainment & Streaming", "amount": 140.0, "category": "want", "max_cut": 100.0},
+        {"id": "shopping", "name": "Shopping & Discretionary", "amount": 220.0, "category": "want", "max_cut": 150.0},
+        {"id": "subscriptions", "name": "Subscriptions & Memberships", "amount": 70.0, "category": "want", "max_cut": 50.0},
+    ]
+
+    if not saved:
+        return {
+            "monthly_income": 5200.0,
+            "pay_frequency": "monthly",
+            "needs": default_needs,
+            "wants": default_wants,
+            "custom_cuts": {"dining": 110.0, "entertainment": 40.0, "shopping": 60.0},
+            "extra_to_debt": 210.0,
+            "debt_minimums": round(debt_minimums, 2),
+            "debt_count": len(debts),
+        }
+
+    saved["debt_minimums"] = round(debt_minimums, 2)
+    saved["debt_count"] = len(debts)
+    return saved
+
+
+@api_router.put("/user/budget-planner")
+async def update_budget_planner(payload: BudgetPlannerPayload, user: dict = Depends(get_current_user)):
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"budget_planner": payload.model_dump()}}
+    )
+    return {"success": True, "budget": payload.model_dump()}
+
+
 @api_router.get("/subscription/plans")
 async def subscription_plans():
     return {
