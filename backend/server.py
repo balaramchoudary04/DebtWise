@@ -1429,10 +1429,15 @@ async def update_dashboard_layout(payload: DashboardLayoutPayload, user: dict = 
 class BudgetPlannerPayload(BaseModel):
     monthly_income: float = 5200.0
     pay_frequency: str = "monthly"
-    needs: List[dict] = []
-    wants: List[dict] = []
-    custom_cuts: Dict[str, float] = {}
-    extra_to_debt: float = 0.0
+    budget_mode: str = "custom"  # "custom" (user planned) or "auto_debt" (website generated)
+    categories: List[dict] = []
+    total_budget: float = 0.0
+    debt_strategy_target: float = 0.0
+    # legacy compatibility:
+    needs: Optional[List[dict]] = None
+    wants: Optional[List[dict]] = None
+    custom_cuts: Optional[Dict[str, float]] = None
+    extra_to_debt: Optional[float] = 0.0
 
 
 @api_router.get("/user/budget-planner")
@@ -1442,31 +1447,38 @@ async def get_budget_planner(user: dict = Depends(get_current_user)):
     debt_minimums = sum(float(d.get("min_payment", 0) or 0) for d in debts)
 
     saved = user_doc.get("budget_planner") if user_doc else None
-    default_needs = [
-        {"id": "housing", "name": "Housing / Rent / Mortgage", "amount": 1650.0, "category": "need"},
-        {"id": "groceries", "name": "Groceries & Supermarket", "amount": 520.0, "category": "need"},
-        {"id": "utilities", "name": "Utilities & Internet", "amount": 240.0, "category": "need"},
-        {"id": "transportation", "name": "Transportation & Gas", "amount": 380.0, "category": "need"},
-        {"id": "healthcare", "name": "Healthcare & Insurance", "amount": 160.0, "category": "need"},
-    ]
-    default_wants = [
-        {"id": "dining", "name": "Dining Out & Takeout", "amount": 310.0, "category": "want", "max_cut": 200.0},
-        {"id": "entertainment", "name": "Entertainment & Streaming", "amount": 140.0, "category": "want", "max_cut": 100.0},
-        {"id": "shopping", "name": "Shopping & Discretionary", "amount": 220.0, "category": "want", "max_cut": 150.0},
-        {"id": "subscriptions", "name": "Subscriptions & Memberships", "amount": 70.0, "category": "want", "max_cut": 50.0},
+    
+    default_categories = [
+        {"id": "housing", "name": "Housing / Rent", "spent": 1650.0, "budget": 1650.0, "icon": "Home"},
+        {"id": "groceries", "name": "Groceries", "spent": 520.0, "budget": 550.0, "icon": "ShoppingCart"},
+        {"id": "utilities", "name": "Utilities & Bills", "spent": 240.0, "budget": 250.0, "icon": "Zap"},
+        {"id": "transportation", "name": "Transportation & Gas", "spent": 380.0, "budget": 400.0, "icon": "Car"},
+        {"id": "healthcare", "name": "Healthcare & Meds", "spent": 160.0, "budget": 180.0, "icon": "HeartPulse"},
+        {"id": "dining", "name": "Dining Out & Takeout", "spent": 310.0, "budget": 350.0, "icon": "Utensils"},
+        {"id": "shopping", "name": "Shopping & Personal", "spent": 220.0, "budget": 250.0, "icon": "ShoppingBag"},
+        {"id": "entertainment", "name": "Entertainment & Fun", "spent": 140.0, "budget": 150.0, "icon": "Film"},
+        {"id": "subscriptions", "name": "Subscriptions", "spent": 70.0, "budget": 70.0, "icon": "Smartphone"},
     ]
 
     if not saved:
         return {
             "monthly_income": 5200.0,
             "pay_frequency": "monthly",
-            "needs": default_needs,
-            "wants": default_wants,
-            "custom_cuts": {"dining": 110.0, "entertainment": 40.0, "shopping": 60.0},
-            "extra_to_debt": 210.0,
+            "budget_mode": "custom",
+            "categories": default_categories,
+            "total_budget": sum(c["budget"] for c in default_categories),
             "debt_minimums": round(debt_minimums, 2),
             "debt_count": len(debts),
         }
+
+    # If saved has old format with needs/wants but no categories
+    if "categories" not in saved or not saved["categories"]:
+        cats = []
+        for n in saved.get("needs", []):
+            cats.append({"id": n.get("id"), "name": n.get("name"), "spent": n.get("amount", 0.0), "budget": n.get("amount", 0.0), "icon": n.get("icon", "DollarSign")})
+        for w in saved.get("wants", []):
+            cats.append({"id": w.get("id"), "name": w.get("name"), "spent": w.get("amount", 0.0), "budget": w.get("amount", 0.0), "icon": w.get("icon", "DollarSign")})
+        saved["categories"] = cats or default_categories
 
     saved["debt_minimums"] = round(debt_minimums, 2)
     saved["debt_count"] = len(debts)
@@ -1475,11 +1487,92 @@ async def get_budget_planner(user: dict = Depends(get_current_user)):
 
 @api_router.put("/user/budget-planner")
 async def update_budget_planner(payload: BudgetPlannerPayload, user: dict = Depends(get_current_user)):
+    data = payload.model_dump()
     await db.users.update_one(
         {"user_id": user["user_id"]},
-        {"$set": {"budget_planner": payload.model_dump()}}
+        {"$set": {"budget_planner": data}}
     )
-    return {"success": True, "budget": payload.model_dump()}
+    return {"success": True, "budget": data}
+
+
+class AutoBuildBudgetRequest(BaseModel):
+    strategy_intensity: str = "balanced"  # "aggressive", "balanced", "relaxed"
+    target_extra_payoff: Optional[float] = None
+
+
+@api_router.post("/user/budget-planner/auto-build")
+async def auto_build_budget(payload: Optional[AutoBuildBudgetRequest] = None, user: dict = Depends(get_current_user)):
+    intensity = payload.strategy_intensity if payload else "balanced"
+    user_doc = await db.users.find_one({"user_id": user["user_id"]}, {"_id": 0, "budget_planner": 1})
+    debts = await db.debts.find({"user_id": user["user_id"]}, {"_id": 0}).to_list(length=100)
+    debt_minimums = sum(float(d.get("min_payment", 0) or 0) for d in debts) or 880.0
+
+    saved = user_doc.get("budget_planner") if user_doc else {}
+    monthly_income = float(saved.get("monthly_income") or 5200.0)
+
+    # Base baseline spending amounts
+    base_spending = [
+        {"id": "housing", "name": "Housing / Rent", "spent": 1650.0, "icon": "Home", "flexible": False},
+        {"id": "groceries", "name": "Groceries", "spent": 520.0, "icon": "ShoppingCart", "flexible": True, "min_budget": 450.0},
+        {"id": "utilities", "name": "Utilities & Bills", "spent": 240.0, "icon": "Zap", "flexible": False},
+        {"id": "transportation", "name": "Transportation & Gas", "spent": 380.0, "icon": "Car", "flexible": True, "min_budget": 300.0},
+        {"id": "healthcare", "name": "Healthcare & Meds", "spent": 160.0, "icon": "HeartPulse", "flexible": False},
+        {"id": "dining", "name": "Dining Out & Takeout", "spent": 310.0, "icon": "Utensils", "flexible": True, "min_budget": 120.0},
+        {"id": "shopping", "name": "Shopping & Personal", "spent": 220.0, "icon": "ShoppingBag", "flexible": True, "min_budget": 80.0},
+        {"id": "entertainment", "name": "Entertainment & Fun", "spent": 140.0, "icon": "Film", "flexible": True, "min_budget": 50.0},
+        {"id": "subscriptions", "name": "Subscriptions", "spent": 70.0, "icon": "Smartphone", "flexible": True, "min_budget": 30.0},
+    ]
+
+    # Calculate target payoff surplus based on intensity
+    if intensity == "aggressive":
+        target_surplus = 860.0
+        discretionary_trim_ratio = 0.45
+    elif intensity == "relaxed":
+        target_surplus = 350.0
+        discretionary_trim_ratio = 0.15
+    else:  # balanced
+        target_surplus = 630.0
+        discretionary_trim_ratio = 0.30
+
+    auto_categories = []
+    total_budget = 0.0
+
+    for item in base_spending:
+        spent = item["spent"]
+        if item.get("flexible"):
+            min_b = item.get("min_budget", spent * 0.5)
+            cut = (spent - min_b) * discretionary_trim_ratio
+            recommended = round(spent - cut, 2)
+        else:
+            recommended = spent
+
+        auto_categories.append({
+            "id": item["id"],
+            "name": item["name"],
+            "spent": spent,
+            "budget": recommended,
+            "icon": item["icon"],
+            "auto_recommended": True,
+        })
+        total_budget += recommended
+
+    total_debt_fuel = round(debt_minimums + target_surplus, 2)
+    base_months = 24
+    accelerated_months = max(6, round(base_months * (debt_minimums / (debt_minimums + target_surplus))))
+    months_saved = max(1, base_months - accelerated_months)
+    interest_saved = round(months_saved * (0.198 / 12) * 18000)
+
+    return {
+        "monthly_income": monthly_income,
+        "debt_minimums": round(debt_minimums, 2),
+        "target_surplus": target_surplus,
+        "total_budget": round(total_budget, 2),
+        "categories": auto_categories,
+        "intensity": intensity,
+        "projected_months_saved": months_saved,
+        "projected_interest_saved": interest_saved,
+        "total_monthly_payoff_power": total_debt_fuel,
+    }
 
 
 @api_router.get("/subscription/plans")

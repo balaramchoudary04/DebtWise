@@ -173,41 +173,33 @@ export default function Dashboard() {
     toast.info("Alert dismissed.");
   };
 
-  // Spend Calculator & Budget Planner State
+  // Monthly Spending Tracker & Budget Planner State
   const [budgetIncome, setBudgetIncome] = useState(5200);
   const [budgetPayFrequency, setBudgetPayFrequency] = useState("monthly");
   const [isEditingIncome, setIsEditingIncome] = useState(false);
   const [tempIncomeInput, setTempIncomeInput] = useState("5200");
-  const [budgetTab, setBudgetTab] = useState("overview"); // "overview" | "categories" | "simulator"
-  const [categoryFilter, setCategoryFilter] = useState("all"); // "all" | "need" | "want"
+  const [budgetMode, setBudgetMode] = useState("custom"); // "custom" | "auto_debt"
+  const [autoIntensity, setAutoIntensity] = useState("balanced"); // "aggressive" | "balanced" | "relaxed"
+  const [showAutoBuildModal, setShowAutoBuildModal] = useState(false);
+  const [autoBuildResult, setAutoBuildResult] = useState(null);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
-  const [tempCategoryAmount, setTempCategoryAmount] = useState("");
-  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
-  const [newExpenseName, setNewExpenseName] = useState("");
-  const [newExpenseAmount, setNewExpenseAmount] = useState("");
-  const [newExpenseType, setNewExpenseType] = useState("need");
+  const [tempCategoryBudget, setTempCategoryBudget] = useState("");
+  const [showAddCategoryModal, setShowAddCategoryModal] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatSpent, setNewCatSpent] = useState("");
+  const [newCatBudget, setNewCatBudget] = useState("");
 
-  const [needsExpenses, setNeedsExpenses] = useState([
-    { id: "housing", name: "Housing (Rent / Mortgage)", amount: 1650, icon: "Home", category: "need" },
-    { id: "groceries", name: "Groceries & Supermarket", amount: 520, icon: "ShoppingBag", category: "need" },
-    { id: "utilities", name: "Utilities & Internet", amount: 240, icon: "Zap", category: "need" },
-    { id: "transportation", name: "Transportation & Gas", amount: 380, icon: "Car", category: "need" },
-    { id: "healthcare", name: "Healthcare & Insurance", amount: 160, icon: "HeartPulse", category: "need" },
+  const [categories, setCategories] = useState([
+    { id: "housing", name: "Housing & Rent", spent: 1650, budget: 1650, icon: "Home" },
+    { id: "groceries", name: "Groceries", spent: 520, budget: 550, icon: "ShoppingBag" },
+    { id: "utilities", name: "Utilities & Bills", spent: 240, budget: 250, icon: "Zap" },
+    { id: "transportation", name: "Transportation & Gas", spent: 380, budget: 400, icon: "Car" },
+    { id: "healthcare", name: "Healthcare & Meds", spent: 160, budget: 180, icon: "HeartPulse" },
+    { id: "dining", name: "Dining Out", spent: 310, budget: 350, icon: "Utensils" },
+    { id: "shopping", name: "Shopping", spent: 220, budget: 250, icon: "ShoppingBag" },
+    { id: "entertainment", name: "Entertainment & Fun", spent: 140, budget: 150, icon: "Film" },
+    { id: "subscriptions", name: "Subscriptions", spent: 70, budget: 70, icon: "Sparkles" },
   ]);
-
-  const [wantsExpenses, setWantsExpenses] = useState([
-    { id: "dining", name: "Dining Out & Takeout", amount: 310, icon: "Utensils", category: "want", maxCut: 200 },
-    { id: "entertainment", name: "Entertainment & Streaming", amount: 140, icon: "Film", category: "want", maxCut: 100 },
-    { id: "shopping", name: "Shopping & Discretionary", amount: 220, icon: "ShoppingBag", category: "want", maxCut: 150 },
-    { id: "subscriptions", name: "Subscriptions & Gym", amount: 70, icon: "Sparkles", category: "want", maxCut: 50 },
-  ]);
-
-  const [cuts, setCuts] = useState({
-    dining: 110,
-    entertainment: 40,
-    shopping: 60,
-    subscriptions: 20,
-  });
 
   const saveBudgetSettings = (updatedBudget) => {
     api.put("/user/budget-planner", updatedBudget).catch(() => {});
@@ -224,96 +216,115 @@ export default function Dashboard() {
     saveBudgetSettings({
       monthly_income: val,
       pay_frequency: budgetPayFrequency,
-      needs: needsExpenses,
-      wants: wantsExpenses,
-      custom_cuts: cuts,
+      budget_mode: budgetMode,
+      categories: categories,
+      total_budget: categories.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0),
     });
     toast.success(`Monthly income updated to $${val.toLocaleString()} (${budgetPayFrequency}).`);
   };
 
-  const handleUpdateCategoryAmount = (id, newAmt) => {
+  const handleUpdateCategoryBudget = (id, newAmt) => {
     const val = parseFloat(newAmt);
     if (isNaN(val) || val < 0) {
-      toast.error("Please enter a valid expense amount.");
+      toast.error("Please enter a valid budget amount.");
       return;
     }
-    const updatedNeeds = needsExpenses.map((n) => (n.id === id ? { ...n, amount: val } : n));
-    const updatedWants = wantsExpenses.map((w) => (w.id === id ? { ...w, amount: val } : w));
-    setNeedsExpenses(updatedNeeds);
-    setWantsExpenses(updatedWants);
+    const updated = categories.map((c) => (c.id === id ? { ...c, budget: val, auto_recommended: false } : c));
+    setCategories(updated);
     setEditingCategoryId(null);
+    setBudgetMode("custom");
     saveBudgetSettings({
       monthly_income: budgetIncome,
       pay_frequency: budgetPayFrequency,
-      needs: updatedNeeds,
-      wants: updatedWants,
-      custom_cuts: cuts,
+      budget_mode: "custom",
+      categories: updated,
+      total_budget: updated.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0),
     });
-    toast.success("Expense category updated.");
+    toast.success("Budget target updated.");
   };
 
-  const handleCutChange = (catId, val) => {
-    const updated = { ...cuts, [catId]: Number(val) };
-    setCuts(updated);
+  const handleOpenAutoBuildModal = async (intensity = "balanced") => {
+    setAutoIntensity(intensity);
+    try {
+      const res = await api.post("/user/budget-planner/auto-build", { strategy_intensity: intensity });
+      if (res.data) {
+        setAutoBuildResult(res.data);
+        setShowAutoBuildModal(true);
+      }
+    } catch {
+      const targetSurplus = intensity === "aggressive" ? 860 : intensity === "relaxed" ? 350 : 630;
+      const trimRatio = intensity === "aggressive" ? 0.45 : intensity === "relaxed" ? 0.15 : 0.30;
+      const updated = categories.map((cat) => {
+        const flexible = ["dining", "shopping", "entertainment", "subscriptions", "groceries", "transportation"].includes(cat.id);
+        if (flexible) {
+          const cut = Math.round(cat.spent * 0.4 * trimRatio);
+          return { ...cat, budget: Math.max(40, cat.spent - cut), auto_recommended: true };
+        }
+        return { ...cat, budget: cat.spent, auto_recommended: true };
+      });
+      setAutoBuildResult({
+        categories: updated,
+        target_surplus: targetSurplus,
+        intensity: intensity,
+        projected_months_saved: intensity === "aggressive" ? 14 : intensity === "relaxed" ? 5 : 9,
+        projected_interest_saved: intensity === "aggressive" ? 2450 : intensity === "relaxed" ? 950 : 1680,
+      });
+      setShowAutoBuildModal(true);
+    }
+  };
+
+  const applyAutoBuiltBudget = () => {
+    if (!autoBuildResult) return;
+    setCategories(autoBuildResult.categories);
+    setBudgetMode("auto_debt");
+    setShowAutoBuildModal(false);
     saveBudgetSettings({
       monthly_income: budgetIncome,
       pay_frequency: budgetPayFrequency,
-      needs: needsExpenses,
-      wants: wantsExpenses,
-      custom_cuts: updated,
+      budget_mode: "auto_debt",
+      categories: autoBuildResult.categories,
+      total_budget: autoBuildResult.categories.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0),
     });
+    toast.success(`✨ Debt-Optimized Budget applied (${autoBuildResult.intensity} strategy)!`);
   };
 
-  const handleAddCustomExpense = (e) => {
+  const handleAddCustomCategory = (e) => {
     e.preventDefault();
-    if (!newExpenseName.trim()) {
-      toast.error("Please enter an expense name.");
+    if (!newCatName.trim()) {
+      toast.error("Please enter a category name.");
       return;
     }
-    const amt = parseFloat(newExpenseAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Please enter a valid monthly amount.");
-      return;
-    }
+    const spentVal = parseFloat(newCatSpent) || 0;
+    const budgetVal = parseFloat(newCatBudget) || (spentVal > 0 ? spentVal : 100);
     const newItem = {
       id: `custom-${Date.now()}`,
-      name: newExpenseName.trim(),
-      amount: amt,
+      name: newCatName.trim(),
+      spent: spentVal,
+      budget: budgetVal,
       icon: "DollarSign",
-      category: newExpenseType,
-      ...(newExpenseType === "want" ? { maxCut: Math.round(amt * 0.75) } : {}),
     };
-
-    let updatedNeeds = needsExpenses;
-    let updatedWants = wantsExpenses;
-    if (newExpenseType === "need") {
-      updatedNeeds = [...needsExpenses, newItem];
-      setNeedsExpenses(updatedNeeds);
-    } else {
-      updatedWants = [...wantsExpenses, newItem];
-      setWantsExpenses(updatedWants);
-    }
-
+    const updated = [...categories, newItem];
+    setCategories(updated);
+    setNewCatName("");
+    setNewCatSpent("");
+    setNewCatBudget("");
+    setShowAddCategoryModal(false);
     saveBudgetSettings({
       monthly_income: budgetIncome,
       pay_frequency: budgetPayFrequency,
-      needs: updatedNeeds,
-      wants: updatedWants,
-      custom_cuts: cuts,
+      budget_mode: budgetMode,
+      categories: updated,
+      total_budget: updated.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0),
     });
-
-    setNewExpenseName("");
-    setNewExpenseAmount("");
-    setShowAddExpenseModal(false);
-    toast.success(`Added "${newItem.name}" ($${amt}/mo) to your budget!`);
+    toast.success(`Added "${newItem.name}" to spending tracker!`);
   };
 
   const handleRefreshPlaidBudget = () => {
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 800)),
       {
-        loading: "Syncing latest checking transactions & liabilities via Plaid...",
-        success: "⚡ Synchronized! $880.00/mo in debt payments verified as internal transfers (100% excluded from spending).",
+        loading: "Syncing checking transactions & liabilities via Plaid...",
+        success: "⚡ Synchronized! $880.00/mo in credit card & loan payments isolated from spending.",
         error: "Sync failed",
       }
     );
@@ -397,14 +408,15 @@ export default function Dashboard() {
             setTempIncomeInput(String(bp.data.monthly_income));
           }
           if (bp.data.pay_frequency) setBudgetPayFrequency(bp.data.pay_frequency);
-          if (bp.data.needs && Array.isArray(bp.data.needs) && bp.data.needs.length > 0) {
-            setNeedsExpenses(bp.data.needs);
-          }
-          if (bp.data.wants && Array.isArray(bp.data.wants) && bp.data.wants.length > 0) {
-            setWantsExpenses(bp.data.wants);
-          }
-          if (bp.data.custom_cuts && typeof bp.data.custom_cuts === "object") {
-            setCuts(bp.data.custom_cuts);
+          if (bp.data.budget_mode) setBudgetMode(bp.data.budget_mode);
+          if (bp.data.categories && Array.isArray(bp.data.categories) && bp.data.categories.length > 0) {
+            setCategories(bp.data.categories);
+          } else if ((bp.data.needs && bp.data.needs.length > 0) || (bp.data.wants && bp.data.wants.length > 0)) {
+            const mapped = [
+              ...(bp.data.needs || []).map((n) => ({ id: n.id, name: n.name, spent: n.amount, budget: n.amount, icon: n.icon || "Home" })),
+              ...(bp.data.wants || []).map((w) => ({ id: w.id, name: w.name, spent: w.amount, budget: w.amount, icon: w.icon || "ShoppingBag" })),
+            ];
+            if (mapped.length > 0) setCategories(mapped);
           }
         }
       })
@@ -702,27 +714,13 @@ export default function Dashboard() {
         );
 
       case "spend_budget_planner": {
-        const totalNeeds = needsExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-        const totalWants = wantsExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-        const totalLivingExpenses = totalNeeds + totalWants;
+        const totalSpent = categories.reduce((s, e) => s + (parseFloat(e.spent) || 0), 0);
+        const totalBudget = categories.reduce((s, e) => s + (parseFloat(e.budget) || 0), 0);
         const totalDebtPayoffs = totalMin > 0 ? totalMin : 880;
-        const totalOutflows = totalLivingExpenses + totalDebtPayoffs;
-        const baseSurplus = Math.max(0, budgetIncome - totalOutflows);
-
-        // Sum discretionary cuts
-        const cutTotal = Object.values(cuts).reduce((acc, val) => acc + (parseFloat(val) || 0), 0);
-        const acceleratedSurplus = baseSurplus + cutTotal;
-
-        // 50/30/20 Percentages
-        const needsPct = budgetIncome > 0 ? Math.min(100, Math.round((totalNeeds / budgetIncome) * 100)) : 0;
-        const wantsPct = budgetIncome > 0 ? Math.min(100, Math.round((totalWants / budgetIncome) * 100)) : 0;
-        const debtAndSurplusPct = budgetIncome > 0 ? Math.min(100, Math.round(((totalDebtPayoffs + baseSurplus) / budgetIncome) * 100)) : 0;
-
-        // Payoff simulation calculation
-        const baseMonths = avalanche?.months || 24;
-        const acceleratedMonths = Math.max(6, Math.round(baseMonths * (totalDebtPayoffs / (totalDebtPayoffs + acceleratedSurplus))));
-        const monthsSaved = Math.max(0, baseMonths - acceleratedMonths);
-        const interestSaved = Math.round(monthsSaved * (avgApr / 100 / 12) * (totalDebt > 0 ? totalDebt * 0.55 : 9500));
+        const totalOutflows = totalSpent + totalDebtPayoffs;
+        const safeSurplus = Math.max(0, budgetIncome - totalOutflows);
+        const budgetRemaining = totalBudget - totalSpent;
+        const budgetPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
         const getCategoryIcon = (iconName) => {
           switch (iconName) {
@@ -738,60 +736,60 @@ export default function Dashboard() {
           }
         };
 
-        const filteredExpenses = [
-          ...needsExpenses.map((n) => ({ ...n, type: "need" })),
-          ...wantsExpenses.map((w) => ({ ...w, type: "want" })),
-        ].filter((item) => {
-          if (categoryFilter === "need") return item.type === "need";
-          if (categoryFilter === "want") return item.type === "want";
-          return true;
-        });
-
         return (
           <div className="glass rounded-2xl p-6 mb-10 border border-teal-500/20 relative" data-testid="card-spend-budget-planner">
-            {/* Header: Concise & Punchy */}
+            {/* Header: Simple Spending Tracker & Budget Planner */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center shrink-0">
                   <Calculator className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-display text-lg font-semibold text-white">Spend Calculator &amp; Budget</h3>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-display text-lg font-semibold text-white">Monthly Spending Tracker &amp; Budget</h3>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> Plaid Transfer Isolation
+                      <ShieldCheck className="w-3 h-3" /> Plaid Transfer Isolation Active
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Real-time cash flow breakdown: debt payments are isolated from spending.
+                    Track actual monthly spending. Plan your own budget or ask DebtWise to auto-build one to hit your debt payoff goal.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              {/* Action Buttons: The 2 Budget Options */}
+              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
                 <button
                   type="button"
-                  onClick={handleRefreshPlaidBudget}
-                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition"
-                  title="Refresh Plaid Checking Sync"
+                  onClick={() => handleOpenAutoBuildModal("balanced")}
+                  className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-teal-500/20 flex items-center gap-1.5 transition active:scale-95"
+                  title="Ask website to build a budget for your debt payoff plan"
                 >
-                  <RefreshCw className="w-3 h-3 text-teal-400" />
-                  Sync Plaid
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Auto-Build for Debt
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddExpenseModal(true)}
-                  className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold shadow-md shadow-teal-600/25 flex items-center gap-1.5 transition"
+                  onClick={() => setShowAddCategoryModal(true)}
+                  className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition"
                 >
-                  <Plus className="w-3 h-3" />
-                  Add Line Item
+                  <Plus className="w-3 h-3 text-teal-400" />
+                  Add Category
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRefreshPlaidBudget}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition"
+                  title="Sync checking transactions via Plaid"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 text-teal-400" />
                 </button>
               </div>
             </div>
 
-            {/* 4 Precise Financial KPIs */}
+            {/* 4 Core Financial KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-              {/* Take-Home Pay */}
+              {/* Monthly Income */}
               <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
                   <span className="text-[10px] uppercase font-bold tracking-wider">Take-Home Pay</span>
@@ -834,449 +832,381 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Living Expenses */}
+              {/* Total Spent This Month */}
               <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Living Expenses</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Total Spent This Month</span>
                 <span className="font-display text-xl font-bold text-teal-400 font-mono block">
-                  ${totalLivingExpenses.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">
-                  Needs ${totalNeeds.toLocaleString()} + Wants ${totalWants.toLocaleString()}
-                </span>
+                <span className="text-[10px] text-slate-400 block mt-0.5">Across {categories.length} categories</span>
               </div>
 
-              {/* Debt Minimums (Isolated) */}
+              {/* Monthly Budget Target */}
               <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
                 <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Debt Payoffs</span>
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">$0 SPEND</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider">Monthly Budget</span>
+                  {budgetMode === "auto_debt" ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" /> Auto-Built
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/10 text-slate-300">Custom</span>
+                  )}
                 </div>
-                <span className="font-display text-xl font-bold text-blue-400 font-mono block">
-                  ${totalDebtPayoffs.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <span className="font-display text-xl font-bold text-white font-mono block">
+                  ${totalBudget.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] text-emerald-400/90 block mt-0.5">
-                  100% Excluded from spending
+                <span className={`text-[10px] block mt-0.5 ${budgetRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} remaining` : `$${Math.abs(budgetRemaining).toFixed(2)} over budget`}
                 </span>
               </div>
 
-              {/* Safe Payoff Surplus */}
+              {/* Safe Surplus to Pay Off Debt */}
               <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900/80 border border-emerald-500/30">
-                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Safe Payoff Surplus</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Safe Debt Payoff Surplus</span>
                 <span className="font-display text-xl font-bold text-emerald-300 font-mono block">
-                  +${baseSurplus.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  +${safeSurplus.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   <span className="text-xs font-normal text-slate-400 ml-1">/mo</span>
                 </span>
                 <span className="text-[10px] text-emerald-400/80 block mt-0.5">
-                  Unallocated free cash flow
+                  Available to accelerate debt payoff
                 </span>
               </div>
             </div>
 
-            {/* Precise Mathematical Cash Flow Strip */}
-            <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs mb-6 font-mono">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-slate-400 uppercase font-sans text-[10px] font-bold">Equation:</span>
-                <span className="text-white">${budgetIncome.toLocaleString()}</span>
-                <span className="text-slate-500 font-sans">inflow</span>
-                <span className="text-slate-400 font-bold">−</span>
-                <span className="text-teal-300">${totalLivingExpenses.toLocaleString()}</span>
-                <span className="text-slate-500 font-sans">living</span>
-                <span className="text-slate-400 font-bold">−</span>
-                <span className="text-blue-300">${totalDebtPayoffs.toFixed(2)}</span>
-                <span className="text-slate-500 font-sans">debt mins</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
-                <span>=</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30">
-                  +${baseSurplus.toFixed(2)}/mo Safe Surplus
-                </span>
-              </div>
-            </div>
-
-            {/* 50/30/20 Allocation Meter (Compact) */}
-            <div className="p-4 rounded-xl bg-slate-900/50 border border-white/5 mb-6">
+            {/* Overall Monthly Spend Progress Bar */}
+            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/5 mb-6">
               <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-semibold text-white text-xs">50/30/20 Budget Breakdown</span>
-                <div className="flex items-center gap-3 text-[11px] font-mono">
-                  <span className="text-blue-400">Needs: {needsPct}% <span className="text-slate-500 font-sans">(target 50%)</span></span>
-                  <span className="text-purple-400">Wants: {wantsPct}% <span className="text-slate-500 font-sans">(target 30%)</span></span>
-                  <span className="text-emerald-400">Debt &amp; Surplus: {debtAndSurplusPct}% <span className="text-slate-500 font-sans">(target 20%)</span></span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-white">Monthly Budget Progress:</span>
+                  <span className="font-mono text-slate-300">
+                    ${totalSpent.toLocaleString()} spent of ${totalBudget.toLocaleString()} limit ({budgetPct}%)
+                  </span>
                 </div>
+                <span className={`font-mono text-xs font-semibold ${budgetRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} under budget` : `$${Math.abs(budgetRemaining).toFixed(2)} over budget`}
+                </span>
               </div>
-              <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden flex">
-                <div style={{ width: `${needsPct}%` }} className="bg-blue-500 transition-all duration-300" title={`Needs: ${needsPct}%`} />
-                <div style={{ width: `${wantsPct}%` }} className="bg-purple-500 transition-all duration-300" title={`Wants: ${wantsPct}%`} />
-                <div style={{ width: `${debtAndSurplusPct}%` }} className="bg-emerald-500 transition-all duration-300" title={`Debt & Surplus: ${debtAndSurplusPct}%`} />
+              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  style={{ width: `${Math.min(100, budgetPct)}%` }}
+                  className={`h-full transition-all duration-500 ${
+                    budgetPct > 100 ? "bg-rose-500" : budgetPct > 90 ? "bg-amber-500" : "bg-teal-500"
+                  }`}
+                />
               </div>
             </div>
 
-            {/* Dual Workbench: Left = Itemized Expenses | Right = Cut & Accelerate Simulator */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Left Column (7 cols): Precise Expense List & Excluded Debt Transfers */}
-              <div className="lg:col-span-7 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs">
+            {/* Category Spending Tracker & Budget Planner Grid */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+                  Spending Categories &amp; Budget Limits
+                </h4>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-slate-500 text-[11px]">Click limit value to adjust your budget</span>
+                  {budgetMode === "auto_debt" && (
                     <button
                       type="button"
-                      onClick={() => setCategoryFilter("all")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                        categoryFilter === "all" ? "bg-white/10 text-white font-semibold" : "text-slate-400 hover:text-white"
-                      }`}
+                      onClick={() => {
+                        setBudgetMode("custom");
+                        toast.info("Switched to custom budget mode. You can edit any budget limit directly.");
+                      }}
+                      className="text-teal-400 hover:text-teal-300 text-xs font-semibold flex items-center gap-1"
                     >
-                      All ({needsExpenses.length + wantsExpenses.length})
+                      Customize Limits
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setCategoryFilter("need")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                        categoryFilter === "need" ? "bg-blue-500/20 text-blue-300 font-semibold" : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Needs (${totalNeeds.toLocaleString()})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setCategoryFilter("want")}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
-                        categoryFilter === "want" ? "bg-purple-500/20 text-purple-300 font-semibold" : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Wants (${totalWants.toLocaleString()})
-                    </button>
-                  </div>
-                  <span className="text-[11px] text-slate-500">Click value to edit</span>
+                  )}
                 </div>
+              </div>
 
-                {/* Living Expenses Rows */}
-                <div className="space-y-1.5 max-h-[340px] overflow-y-auto pr-1">
-                  {filteredExpenses.map((item) => {
-                    const isEditing = editingCategoryId === item.id;
-                    const pct = budgetIncome > 0 ? ((item.amount / budgetIncome) * 100).toFixed(1) : 0;
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {categories.map((cat) => {
+                  const spent = Number(cat.spent) || 0;
+                  const budget = Number(cat.budget) || 0;
+                  const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+                  const diff = budget - spent;
+                  const isEditing = editingCategoryId === cat.id;
 
-                    return (
-                      <div
-                        key={item.id}
-                        className="px-3 py-2 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 flex items-center justify-between gap-3 text-xs transition"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              item.type === "need"
-                                ? "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                                : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                            }`}
-                          >
-                            {getCategoryIcon(item.icon)}
+                  return (
+                    <div
+                      key={cat.id}
+                      className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center shrink-0">
+                            {getCategoryIcon(cat.icon)}
                           </div>
-                          <span className="text-white font-medium truncate">{item.name}</span>
-                          <span
-                            className={`text-[9px] font-bold px-1.5 py-0.2 rounded uppercase shrink-0 ${
-                              item.type === "need" ? "bg-blue-500/15 text-blue-300" : "bg-purple-500/15 text-purple-300"
-                            }`}
-                          >
-                            {item.type}
-                          </span>
+                          <span className="text-white font-medium text-xs truncate">{cat.name}</span>
                         </div>
+                        {cat.auto_recommended && budgetMode === "auto_debt" && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/15 text-teal-300 shrink-0">
+                            Debt Target
+                          </span>
+                        )}
+                      </div>
 
-                        <div className="flex items-center gap-3 shrink-0">
-                          <span className="text-[11px] font-mono text-slate-400">{pct}%</span>
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                value={tempCategoryAmount}
-                                onChange={(e) => setTempCategoryAmount(e.target.value)}
-                                className="w-16 bg-slate-950 border border-teal-500 rounded px-1.5 py-0.5 text-xs text-white font-mono text-right"
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateCategoryAmount(item.id, tempCategoryAmount)}
-                                className="p-1 rounded bg-teal-600 text-white hover:bg-teal-500"
-                              >
-                                <Check className="w-3 h-3" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingCategoryId(null)}
-                                className="p-1 rounded bg-white/5 text-slate-400"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
+                      {/* Spent vs Budget */}
+                      <div className="flex items-baseline justify-between text-xs mb-1.5">
+                        <span className="text-slate-400 text-[11px]">
+                          Spent: <strong className="text-white font-mono">${spent.toFixed(2)}</strong>
+                        </span>
+
+                        {isEditing ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 text-xs">$</span>
+                            <input
+                              type="number"
+                              value={tempCategoryBudget}
+                              onChange={(e) => setTempCategoryBudget(e.target.value)}
+                              className="w-16 bg-slate-950 border border-teal-500 rounded px-1 py-0.5 text-xs text-white font-mono text-right"
+                              autoFocus
+                            />
                             <button
                               type="button"
-                              onClick={() => {
-                                setEditingCategoryId(item.id);
-                                setTempCategoryAmount(String(item.amount));
-                              }}
-                              className="font-mono text-xs font-semibold text-white hover:text-teal-400 flex items-center gap-1"
-                              title="Edit amount"
+                              onClick={() => handleUpdateCategoryBudget(cat.id, tempCategoryBudget)}
+                              className="p-1 rounded bg-teal-600 text-white hover:bg-teal-500"
                             >
-                              ${Number(item.amount).toFixed(2)}
-                              <Edit2 className="w-2.5 h-2.5 text-slate-500" />
+                              <Check className="w-3 h-3" />
                             </button>
-                          )}
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCategoryId(null)}
+                              className="p-1 rounded bg-white/5 text-slate-400"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCategoryId(cat.id);
+                              setTempCategoryBudget(String(budget));
+                            }}
+                            className="text-slate-400 hover:text-teal-400 text-[11px] flex items-center gap-1 group"
+                            title="Click to edit budget limit"
+                          >
+                            <span>Limit:</span>
+                            <strong className="text-teal-300 font-mono group-hover:underline">${budget.toFixed(2)}</strong>
+                            <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-teal-400" />
+                          </button>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
 
-                {/* Excluded Debt Accounts Ledger (Compact) */}
-                <div className="pt-2 border-t border-white/5">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400 mb-1.5 uppercase">
-                    <span>Connected Debt Payoffs (Plaid Reconciled)</span>
-                    <span className="text-emerald-400 font-mono">${totalDebtPayoffs.toFixed(2)}/mo</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {debts.map((d) => (
-                      <div
-                        key={d.debt_id}
-                        className="p-2 rounded-lg bg-slate-900/40 border border-white/5 flex items-center justify-between text-xs"
-                      >
-                        <div className="min-w-0 pr-1">
-                          <span className="text-white font-medium text-[11px] block truncate">{d.name}</span>
-                          <span className="text-[9px] text-emerald-400 uppercase font-semibold">Excluded Transfer</span>
-                        </div>
-                        <span className="font-mono text-xs font-bold text-emerald-400 shrink-0">
-                          ${Number(d.min_payment).toFixed(2)}
+                      {/* Visual Meter */}
+                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
+                        <div
+                          style={{ width: `${Math.min(100, pct)}%` }}
+                          className={`h-full transition-all duration-300 ${
+                            pct > 100 ? "bg-rose-500" : pct > 90 ? "bg-amber-500" : "bg-teal-500"
+                          }`}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500 font-mono">{pct}% used</span>
+                        <span className={`font-mono font-medium ${diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                          {diff >= 0 ? `$${diff.toFixed(2)} left` : `$${Math.abs(diff).toFixed(2)} over`}
                         </span>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Right Column (5 cols): "Cut & Accelerate" Real-Time Simulator */}
-              <div className="lg:col-span-5 space-y-4 p-4 rounded-xl bg-slate-900/40 border border-white/5 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between pb-2 border-b border-white/5 mb-3">
-                    <span className="text-xs font-semibold text-white flex items-center gap-1.5">
-                      <Scissors className="w-3.5 h-3.5 text-teal-400" />
-                      Trim Discretionary Spend
-                    </span>
-                    <span className="text-xs font-mono font-bold text-emerald-400">
-                      +${cutTotal.toFixed(2)}/mo cut
-                    </span>
-                  </div>
-
-                  {/* 4 Sliders */}
-                  <div className="space-y-3">
-                    {/* Dining */}
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-300">Dining Out</span>
-                        <span className="font-mono text-emerald-400 font-semibold">+${cuts.dining || 0}/mo</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="200"
-                        step="10"
-                        value={cuts.dining || 0}
-                        onChange={(e) => handleCutChange("dining", e.target.value)}
-                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
-                        <span>$310 orig</span>
-                        <span>${(310 - (cuts.dining || 0))} left</span>
-                      </div>
                     </div>
-
-                    {/* Entertainment */}
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-300">Streaming &amp; Fun</span>
-                        <span className="font-mono text-emerald-400 font-semibold">+${cuts.entertainment || 0}/mo</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="10"
-                        value={cuts.entertainment || 0}
-                        onChange={(e) => handleCutChange("entertainment", e.target.value)}
-                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
-                        <span>$140 orig</span>
-                        <span>${(140 - (cuts.entertainment || 0))} left</span>
-                      </div>
-                    </div>
-
-                    {/* Shopping */}
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-300">Shopping</span>
-                        <span className="font-mono text-emerald-400 font-semibold">+${cuts.shopping || 0}/mo</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="150"
-                        step="10"
-                        value={cuts.shopping || 0}
-                        onChange={(e) => handleCutChange("shopping", e.target.value)}
-                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
-                        <span>$220 orig</span>
-                        <span>${(220 - (cuts.shopping || 0))} left</span>
-                      </div>
-                    </div>
-
-                    {/* Subscriptions */}
-                    <div>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-300">Subscriptions</span>
-                        <span className="font-mono text-emerald-400 font-semibold">+${cuts.subscriptions || 0}/mo</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="50"
-                        step="5"
-                        value={cuts.subscriptions || 0}
-                        onChange={(e) => handleCutChange("subscriptions", e.target.value)}
-                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-teal-500"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-0.5">
-                        <span>$70 orig</span>
-                        <span>${(70 - (cuts.subscriptions || 0))} left</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Simulated Results Card */}
-                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-teal-500/30 space-y-3 mt-4">
-                  <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-white/5">
-                    <span className="text-slate-400 font-sans">Total Payoff Fuel:</span>
-                    <span className="text-emerald-300 font-bold text-sm">
-                      +${acceleratedSurplus.toFixed(2)}/mo
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase block">Time Saved</span>
-                      <span className="font-mono font-bold text-teal-300 text-sm">
-                        {monthsSaved} Months
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">Done in ~{acceleratedMonths} mo</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 uppercase block">Interest Saved</span>
-                      <span className="font-mono font-bold text-emerald-400 text-sm">
-                        ${interestSaved.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-slate-500 block">Compounding cut</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      api.post("/strategies/compare", null, { params: { extra_payment: acceleratedSurplus } })
-                        .then((res) => {
-                          setCompare(res.data);
-                          toast.success(`Applied +$${acceleratedSurplus.toFixed(2)}/mo to Avalanche Strategy!`);
-                        })
-                        .catch(() => {
-                          toast.success(`Applied +$${acceleratedSurplus.toFixed(2)}/mo to Strategy!`);
-                        });
-                    }}
-                    className="w-full py-2.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-semibold text-xs shadow-md shadow-teal-500/20 flex items-center justify-center gap-1.5 transition active:scale-95"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    Apply +${acceleratedSurplus.toFixed(2)}/mo to Strategy
-                  </button>
-                </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Modal: Add Custom Expense */}
-            {showAddExpenseModal && (
+            {/* Plaid Reconciled Debt Payoffs Strip (Explicitly Excluded from Spending) */}
+            <div className="p-3 rounded-xl bg-slate-900/40 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <div>
+                  <span className="text-white font-medium">Connected Debt Payments (Auto-Reconciled):</span>
+                  <span className="text-slate-400 ml-1">
+                    Chase Sapphire ($240), Citi ($160), Auto Loan ($310), Student Loan ($170) ={" "}
+                    <strong className="text-emerald-400 font-mono">${totalDebtPayoffs.toFixed(2)}/mo</strong>
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0 self-start sm:self-auto">
+                100% Excluded from spending (Zero double-counting)
+              </span>
+            </div>
+
+            {/* Modal: Auto-Build Budget for Debt Strategy */}
+            {showAutoBuildModal && autoBuildResult && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-                <div className="glass-strong rounded-2xl p-6 w-full max-w-md border border-white/15 shadow-2xl relative">
+                <div className="glass-strong rounded-2xl p-6 w-full max-w-lg border border-teal-500/30 shadow-2xl relative">
                   <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-                    <h3 className="font-display text-base font-semibold text-white">
-                      Add Custom Budget Line Item
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-teal-400" />
+                      <h3 className="font-display text-base font-semibold text-white">
+                        Auto-Build Budget for Debt Payoff
+                      </h3>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setShowAddExpenseModal(false)}
-                      className="p-1 rounded text-slate-400 hover:text-white"
+                      onClick={() => setShowAutoBuildModal(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
                     >
                       <X className="w-4 h-4" />
                     </button>
                   </div>
 
-                  <form onSubmit={handleAddCustomExpense} className="space-y-4 text-xs">
+                  <p className="text-xs text-slate-300 mb-4">
+                    DebtWise calculates spending targets across your categories that free up cash to accelerate debt payoff according to your plan:
+                  </p>
+
+                  {/* Intensity Selector */}
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAutoBuildModal("relaxed")}
+                      className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                        autoIntensity === "relaxed"
+                          ? "bg-teal-500/20 border-teal-500 text-teal-300"
+                          : "bg-slate-900/40 border-white/5 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <span className="block font-bold">Comfortable</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">+5 mo faster</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAutoBuildModal("balanced")}
+                      className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                        autoIntensity === "balanced"
+                          ? "bg-teal-500/20 border-teal-500 text-teal-300"
+                          : "bg-slate-900/40 border-white/5 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <span className="block font-bold">Balanced</span>
+                      <span className="text-[10px] text-teal-400 block mt-0.5">+9 mo faster</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenAutoBuildModal("aggressive")}
+                      className={`p-2.5 rounded-xl border text-left text-xs transition ${
+                        autoIntensity === "aggressive"
+                          ? "bg-teal-500/20 border-teal-500 text-teal-300"
+                          : "bg-slate-900/40 border-white/5 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      <span className="block font-bold">Aggressive</span>
+                      <span className="text-[10px] text-emerald-400 block mt-0.5">+14 mo faster</span>
+                    </button>
+                  </div>
+
+                  {/* Projected Impact Preview */}
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-white/5 grid grid-cols-3 gap-2 text-center text-xs mb-4">
                     <div>
-                      <label className="block text-slate-300 mb-1 font-medium">Expense Name</label>
+                      <span className="text-[10px] text-slate-400 uppercase block">Extra Payoff Power</span>
+                      <span className="font-mono font-bold text-emerald-400 text-sm">
+                        +${autoBuildResult.target_surplus.toFixed(2)}/mo
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase block">Time Saved</span>
+                      <span className="font-mono font-bold text-teal-300 text-sm">
+                        {autoBuildResult.projected_months_saved} Months
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase block">Interest Saved</span>
+                      <span className="font-mono font-bold text-emerald-300 text-sm">
+                        ${autoBuildResult.projected_interest_saved.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setShowAutoBuildModal(false)}
+                      className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyAutoBuiltBudget}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-teal-500/20"
+                    >
+                      Apply This Budget
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Add Custom Category */}
+            {showAddCategoryModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+                <div className="glass-strong rounded-2xl p-6 w-full max-w-md border border-white/15 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <h3 className="font-display text-base font-semibold text-white">
+                      Add Custom Spending Category
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddCategoryModal(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleAddCustomCategory} className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Category Name</label>
                       <input
                         type="text"
-                        placeholder="e.g. Pet Care, Gym Membership"
-                        value={newExpenseName}
-                        onChange={(e) => setNewExpenseName(e.target.value)}
+                        placeholder="e.g. Pet Care, Hobbies, Gym"
+                        value={newCatName}
+                        onChange={(e) => setNewCatName(e.target.value)}
                         className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400"
+                        required
                         autoFocus
                       />
                     </div>
 
-                    <div>
-                      <label className="block text-slate-300 mb-1 font-medium">Monthly Amount ($)</label>
-                      <input
-                        type="number"
-                        placeholder="85.00"
-                        value={newExpenseAmount}
-                        onChange={(e) => setNewExpenseAmount(e.target.value)}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-slate-300 mb-1.5 font-medium">Classification</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition ${newExpenseType === "need" ? "bg-blue-500/20 border-blue-500/40 text-blue-300" : "bg-white/5 border-white/10 text-slate-400"}`}>
-                          <input
-                            type="radio"
-                            name="type"
-                            checked={newExpenseType === "need"}
-                            onChange={() => setNewExpenseType("need")}
-                            className="sr-only"
-                          />
-                          <span className="font-semibold">Need (Essential)</span>
-                        </label>
-                        <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition ${newExpenseType === "want" ? "bg-purple-500/20 border-purple-500/40 text-purple-300" : "bg-white/5 border-white/10 text-slate-400"}`}>
-                          <input
-                            type="radio"
-                            name="type"
-                            checked={newExpenseType === "want"}
-                            onChange={() => setNewExpenseType("want")}
-                            className="sr-only"
-                          />
-                          <span className="font-semibold">Want (Discretionary)</span>
-                        </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 mb-1 font-medium">Monthly Spent ($)</label>
+                        <input
+                          type="number"
+                          placeholder="80.00"
+                          value={newCatSpent}
+                          onChange={(e) => setNewCatSpent(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 mb-1 font-medium">Budget Limit ($)</label>
+                        <input
+                          type="number"
+                          placeholder="100.00"
+                          value={newCatBudget}
+                          onChange={(e) => setNewCatBudget(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
+                        />
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
                       <button
                         type="button"
-                        onClick={() => setShowAddExpenseModal(false)}
-                        className="px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/5"
+                        onClick={() => setShowAddCategoryModal(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-500/20"
+                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-600/25"
                       >
-                        Add to Budget
+                        Add Category
                       </button>
                     </div>
                   </form>
