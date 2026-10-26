@@ -251,10 +251,10 @@ export default function Debts() {
     <div data-testid="debts-page">
       <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
         <div>
-          <p className="text-label mb-3">Manage</p>
-          <h1 className="font-display text-4xl sm:text-5xl font-light tracking-tighter">My debts</h1>
+          <p className="text-label mb-3 uppercase tracking-wider text-xs font-bold text-slate-400">Portfolio &amp; Liabilities</p>
+          <h1 className="font-display text-4xl sm:text-5xl font-light tracking-tighter text-white">Debt Planner &amp; Tracker</h1>
           <p className="text-slate-400 mt-2 text-sm">
-            {debts.length} {debts.length === 1 ? "debt" : "debts"} · {fmtMoney(totalDebt)} total
+            {debts.length} {debts.length === 1 ? "debt account" : "debt accounts"} · {fmtMoney(totalDebt)} total balance being optimized
           </p>
         </div>
         <div className="flex gap-3 self-start">

@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import StrategyCustom from "./pages/StrategyCustom";
 import AuthCallback from "./pages/AuthCallback";
 import CreditScore from "./pages/CreditScore";
+import SpendingBudget from "./pages/SpendingBudget";
 import AppLayout from "./components/AppLayout";
 
 function ProtectedRoute({ children }) {
@@ -45,6 +46,8 @@ function AppRouter() {
         }
       >
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/spending" element={<SpendingBudget />} />
+        <Route path="/budget" element={<Navigate to="/spending" replace />} />
         <Route path="/debts" element={<Debts />} />
         <Route path="/strategies" element={<Strategies />} />
         <Route path="/strategies/custom" element={<StrategyCustom />} />

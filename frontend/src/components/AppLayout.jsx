@@ -29,6 +29,8 @@ import { toast } from "sonner";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, testid: "nav-dashboard" },
+  { to: "/spending", label: "Spending & Budget", icon: Calculator, testid: "nav-spending" },
+  { to: "/debts", label: "Debt Planner", icon: TrendingDown, testid: "nav-debt-planner" },
   { to: "/strategies", label: "Strategies", icon: GitCompare, testid: "nav-strategies" },
   { to: "/credit-score", label: "Credit Score", icon: Gauge, testid: "nav-credit-score" },
 ];
@@ -429,8 +431,62 @@ export default function AppLayout() {
         </nav>
       </div>
 
-      <main className="flex-1 min-w-0 pt-32 lg:pt-0">
-        <div className="p-6 md:p-10 max-w-7xl mx-auto">
+      <main className="flex-1 min-w-0 pt-32 lg:pt-0 flex flex-col">
+        {/* Desktop Header Pill Navigation (Matching Screenshot) */}
+        <header className="hidden lg:flex items-center justify-between px-8 py-3.5 border-b border-white/5 sticky top-0 z-30 glass-strong backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl glass glow-blue flex items-center justify-center">
+                <TrendingDown className="w-4 h-4 text-blue-400" />
+              </div>
+              <span className="font-display text-base tracking-tight font-semibold text-white">DebtWise</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider ml-1">
+                Credit Monitor Active
+              </span>
+            </div>
+          </div>
+
+          {/* Primary Top Pill Nav */}
+          <nav className="flex items-center gap-1 p-1 rounded-xl bg-slate-900/80 border border-white/10 text-xs">
+            {navItems.map(({ to, label, icon: Icon, testid }) => (
+              <NavLink
+                key={to}
+                to={to}
+                data-testid={`top-${testid}`}
+                className={({ isActive }) =>
+                  `px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                      : "text-slate-400 hover:text-white"
+                  }`
+                }
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {label}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* Right Controls */}
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => navigate("/credit-score")}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Score: <strong>695</strong></span>
+            </button>
+            <button
+              onClick={() => navigate("/debts")}
+              className="text-xs bg-blue-600 hover:bg-blue-500 text-white font-medium px-3.5 py-1.5 rounded-lg transition shadow-[0_0_15px_rgba(37,99,235,0.4)] flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Debt</span>
+            </button>
+          </div>
+        </header>
+
+        <div className="p-6 md:p-10 max-w-7xl mx-auto flex-1 w-full">
           <Outlet />
         </div>
       </main>
