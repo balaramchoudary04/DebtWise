@@ -441,6 +441,29 @@ export default function Dashboard() {
     api.put("/user/budget-planner", updatedBudget).catch(() => {});
   };
 
+  const handleViewAllTransactionsFromModal = (accountFilter = "all") => {
+    setShowSpentBreakdownModal(false);
+    setActiveSpendTab("transactions");
+    setTxSearch("");
+    setTxAccountFilter(accountFilter);
+    setTxCategoryFilter("all");
+    setTimeout(() => {
+      const el = document.getElementById("spend-transactions-list-section");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+        el.classList.add("ring-2", "ring-teal-400", "rounded-2xl", "transition-all", "duration-700");
+        setTimeout(() => {
+          el.classList.remove("ring-2", "ring-teal-400");
+        }, 2200);
+      }
+    }, 150);
+    toast.success(
+      accountFilter === "all"
+        ? `Viewing all ${transactions.length} transactions across connected accounts.`
+        : `Filtered to ${accountFilter} transactions.`
+    );
+  };
+
   const handleOpenBudgetEditor = () => {
     setDraftCategories(categories.map((c) => ({ ...c })));
     setShowEditBudgetModal(true);
@@ -1374,7 +1397,7 @@ export default function Dashboard() {
 
             {/* TAB 1: LIST VIEW OF EACH TRANSACTION ACROSS ALL SPEND ACCOUNTS */}
             {activeSpendTab === "transactions" && (
-              <div className="space-y-2 mb-6">
+              <div id="spend-transactions-list-section" className="space-y-2 mb-6">
                 {filteredTransactions.length === 0 ? (
                   <div className="p-8 text-center rounded-xl bg-slate-900/40 border border-white/5">
                     <p className="text-sm text-slate-400">No transactions match your current filters.</p>
@@ -1913,15 +1936,15 @@ export default function Dashboard() {
             {/* Modal: Monthly Spending Breakdown (Reactive) */}
             {showSpentBreakdownModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-                <div className="glass-strong rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-rose-500/30 shadow-2xl relative">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                <div className="glass-strong rounded-3xl p-6 sm:p-7 max-w-xl w-full max-h-[90vh] flex flex-col border border-rose-500/30 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4 shrink-0">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
                         <ArrowUp className="w-4 h-4" />
                       </div>
                       <div>
                         <h3 className="font-display text-base font-semibold text-white">Monthly Spending Breakdown</h3>
-                        <p className="text-xs text-slate-400">Total spent across all connected accounts this month.</p>
+                        <p className="text-xs text-slate-400">Total spent across all connected spend accounts this month.</p>
                       </div>
                     </div>
                     <button
@@ -1933,7 +1956,7 @@ export default function Dashboard() {
                     </button>
                   </div>
 
-                  <div className="space-y-4 text-xs">
+                  <div className="space-y-4 text-xs overflow-y-auto pr-1 flex-1">
                     <div className="p-4 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between">
                       <div>
                         <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Spent This Month</span>
@@ -1946,9 +1969,12 @@ export default function Dashboard() {
                       </span>
                     </div>
 
-                    {/* Spend by Account */}
+                    {/* Spend by Account (Clickable to Filter) */}
                     <div>
-                      <h4 className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-2">Spending by Connected Account</h4>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Spending by Connected Account</h4>
+                        <span className="text-[10px] text-teal-400 font-medium">Click account to filter &amp; view</span>
+                      </div>
                       <div className="space-y-1.5">
                         {spendAccountOptions.map((acct) => {
                           const acctTxns = livingTxns.filter((t) => t.account_name === acct);
@@ -1956,9 +1982,14 @@ export default function Dashboard() {
                           const acctPct = totalSpent > 0 ? Math.round((acctSpent / totalSpent) * 100) : 0;
 
                           return (
-                            <div key={acct} className="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+                            <div
+                              key={acct}
+                              onClick={() => handleViewAllTransactionsFromModal(acct)}
+                              className="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 hover:border-teal-500/40 hover:bg-slate-900/90 transition cursor-pointer flex items-center justify-between group"
+                              title={`Click to filter list to ${acct}`}
+                            >
                               <div className="min-w-0">
-                                <span className="text-white font-medium block truncate">{acct}</span>
+                                <span className="text-white group-hover:text-teal-300 font-medium block truncate transition">{acct}</span>
                                 <span className="text-[10px] text-slate-500">{acctTxns.length} transactions</span>
                               </div>
                               <div className="text-right">
@@ -1971,6 +2002,31 @@ export default function Dashboard() {
                       </div>
                     </div>
 
+                    {/* Recent Living Transactions List inside modal */}
+                    <div>
+                      <h4 className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-2">
+                        Recent Spend Transactions ({livingTxns.length})
+                      </h4>
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                        {livingTxns.map((tx) => (
+                          <div key={tx.transaction_id} className="p-2 rounded-lg bg-slate-900/40 border border-white/5 flex items-center justify-between">
+                            <div className="min-w-0 flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-md bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+                                {getCategoryIcon(tx.category)}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs font-semibold text-white block truncate">{tx.name}</span>
+                                <span className="text-[10px] text-slate-400 font-mono">{tx.category} • {formatTxDate(tx.date)}</span>
+                              </div>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-white shrink-0">
+                              -${Number(tx.amount).toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Plaid Isolation Notice */}
                     <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1978,20 +2034,24 @@ export default function Dashboard() {
                         <strong className="text-emerald-400 font-medium">Plaid Isolation Active:</strong> Credit card and loan payments made from your checking account are automatically excluded ($0.00 spend) so they are not counted twice.
                       </p>
                     </div>
+                  </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowSpentBreakdownModal(false);
-                          setActiveSpendTab("transactions");
-                        }}
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-600/25 flex items-center gap-1.5"
-                      >
-                        <CreditCard className="w-3.5 h-3.5" />
-                        View All Transactions in List
-                      </button>
-                    </div>
+                  <div className="flex items-center justify-between gap-2 pt-3 border-t border-white/10 mt-3 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setShowSpentBreakdownModal(false)}
+                      className="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleViewAllTransactionsFromModal("all")}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-teal-500/20 flex items-center gap-1.5 transition active:scale-95"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      View All Transactions in List ↓
+                    </button>
                   </div>
                 </div>
               </div>
