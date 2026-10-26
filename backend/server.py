@@ -2257,6 +2257,244 @@ async def get_spending_summary(user: dict = Depends(get_current_user)):
     }
 
 
+class UpdateTransactionCategoryPayload(BaseModel):
+    category: str
+
+
+class CreateTransactionPayload(BaseModel):
+    name: str
+    account_name: str = "Chase Total Checking (••4921)"
+    amount: float
+    date: Optional[str] = None
+    category: str = "Food & Dining"
+
+
+DEFAULT_SPEND_TRANSACTIONS = [
+    {
+        "transaction_id": "tx-101",
+        "name": "Whole Foods Market",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 142.50,
+        "date": "2026-10-25",
+        "category": "Food & Dining",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-102",
+        "name": "Con Edison Electric & Gas",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 185.00,
+        "date": "2026-10-24",
+        "category": "Utilities",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-103",
+        "name": "Chipotle Mexican Grill",
+        "account_name": "Amex Blue Cash (••1024)",
+        "account_type": "credit",
+        "amount": 24.80,
+        "date": "2026-10-24",
+        "category": "Food & Dining",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-104",
+        "name": "Target Supercenter",
+        "account_name": "Capital One SavorOne (••8832)",
+        "account_type": "credit",
+        "amount": 118.40,
+        "date": "2026-10-23",
+        "category": "Shopping",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-105",
+        "name": "Shell Oil Gas Station",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 52.00,
+        "date": "2026-10-22",
+        "category": "Transportation",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-106",
+        "name": "Netflix & Spotify Subscription",
+        "account_name": "Amex Blue Cash (••1024)",
+        "account_type": "credit",
+        "amount": 32.98,
+        "date": "2026-10-21",
+        "category": "Entertainment",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-107",
+        "name": "Trader Joe's",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 86.30,
+        "date": "2026-10-20",
+        "category": "Food & Dining",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-108",
+        "name": "CVS Pharmacy & Care",
+        "account_name": "Bank of America Checking (••3319)",
+        "account_type": "checking",
+        "amount": 45.20,
+        "date": "2026-10-19",
+        "category": "Healthcare",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-109",
+        "name": "AMC Theatres Movies & Snacks",
+        "account_name": "Capital One SavorOne (••8832)",
+        "account_type": "credit",
+        "amount": 38.50,
+        "date": "2026-10-18",
+        "category": "Entertainment",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-110",
+        "name": "Amazon Marketplace",
+        "account_name": "Amex Blue Cash (••1024)",
+        "account_type": "credit",
+        "amount": 74.90,
+        "date": "2026-10-17",
+        "category": "Shopping",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-111",
+        "name": "Verizon Wireless & Fios",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 125.00,
+        "date": "2026-10-16",
+        "category": "Utilities",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-112",
+        "name": "Uber Transit & Rides",
+        "account_name": "Amex Blue Cash (••1024)",
+        "account_type": "credit",
+        "amount": 34.50,
+        "date": "2026-10-15",
+        "category": "Transportation",
+        "is_spending": True,
+        "is_internal_transfer": False,
+    },
+    {
+        "transaction_id": "tx-113",
+        "name": "Chase Sapphire Credit Card AutoPay",
+        "account_name": "Chase Total Checking (••4921)",
+        "account_type": "checking",
+        "amount": 240.00,
+        "date": "2026-10-14",
+        "category": "Debt Transfer (Excluded)",
+        "is_spending": False,
+        "is_internal_transfer": True,
+        "matched_debt_name": "Chase Sapphire Preferred",
+    },
+]
+
+
+@api_router.get("/transactions")
+async def list_transactions(user: dict = Depends(get_current_user)):
+    """Returns list of transactions across all user spend accounts with categories."""
+    txns = await db.transactions.find({"user_id": user["user_id"]}, {"_id": 0}).sort("date", -1).to_list(length=200)
+    if not txns:
+        # Seed default transactions for interactive experience
+        user_defaults = []
+        for dt in DEFAULT_SPEND_TRANSACTIONS:
+            doc = {**dt, "user_id": user["user_id"]}
+            user_defaults.append(doc)
+            await db.transactions.update_one(
+                {"user_id": user["user_id"], "transaction_id": dt["transaction_id"]},
+                {"$set": doc},
+                upsert=True,
+            )
+        return user_defaults
+
+    # Format category field if it was stored as list
+    formatted = []
+    for t in txns:
+        cat = t.get("category")
+        if isinstance(cat, list):
+            cat_name = cat[0] if cat else "Other"
+        else:
+            cat_name = cat or "Other"
+        formatted.append({**t, "category": cat_name})
+    return formatted
+
+
+@api_router.put("/transactions/{transaction_id}/category")
+async def update_transaction_category(
+    transaction_id: str,
+    payload: UpdateTransactionCategoryPayload,
+    user: dict = Depends(get_current_user),
+):
+    """Reassign category for a transaction."""
+    res = await db.transactions.update_one(
+        {"user_id": user["user_id"], "transaction_id": transaction_id},
+        {"$set": {"category": payload.category}},
+    )
+    if res.matched_count == 0:
+        # Check if in default seed set and save it
+        matched_seed = next((t for t in DEFAULT_SPEND_TRANSACTIONS if t["transaction_id"] == transaction_id), None)
+        if matched_seed:
+            doc = {**matched_seed, "user_id": user["user_id"], "category": payload.category}
+            await db.transactions.insert_one(doc)
+            return {"success": True, "transaction_id": transaction_id, "category": payload.category}
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"success": True, "transaction_id": transaction_id, "category": payload.category}
+
+
+@api_router.post("/transactions")
+async def create_transaction(payload: CreateTransactionPayload, user: dict = Depends(get_current_user)):
+    """Create manual transaction."""
+    tx_id = f"tx-{uuid.uuid4().hex[:8]}"
+    doc = {
+        "user_id": user["user_id"],
+        "transaction_id": tx_id,
+        "name": payload.name,
+        "account_name": payload.account_name,
+        "amount": round(payload.amount, 2),
+        "date": payload.date or date.today().isoformat(),
+        "category": payload.category,
+        "is_spending": True,
+        "is_internal_transfer": False,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.transactions.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.delete("/transactions/{transaction_id}")
+async def delete_transaction(transaction_id: str, user: dict = Depends(get_current_user)):
+    await db.transactions.delete_one({"user_id": user["user_id"], "transaction_id": transaction_id})
+    return {"success": True}
+
+
 @api_router.delete("/plaid/items/{item_id}")
 async def plaid_remove_item(item_id: str, user: dict = Depends(get_current_user)):
     res = await db.plaid_items.delete_one({"user_id": user["user_id"], "item_id": item_id})

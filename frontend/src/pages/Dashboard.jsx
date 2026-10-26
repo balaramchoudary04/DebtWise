@@ -57,6 +57,7 @@ import {
   TrendingDown,
   Layers,
   HelpCircle,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "../contexts/AuthContext";
@@ -189,6 +190,151 @@ export default function Dashboard() {
   const [newCatSpent, setNewCatSpent] = useState("");
   const [newCatBudget, setNewCatBudget] = useState("");
 
+  // Spend Accounts Transactions State
+  const [transactions, setTransactions] = useState([
+    {
+      transaction_id: "tx-101",
+      name: "Whole Foods Market",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 142.50,
+      date: "2026-10-25",
+      category: "Food & Dining",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-102",
+      name: "Con Edison Electric & Gas",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 185.00,
+      date: "2026-10-24",
+      category: "Utilities",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-103",
+      name: "Chipotle Mexican Grill",
+      account_name: "Amex Blue Cash (••1024)",
+      amount: 24.80,
+      date: "2026-10-24",
+      category: "Food & Dining",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-104",
+      name: "Target Supercenter",
+      account_name: "Capital One SavorOne (••8832)",
+      amount: 118.40,
+      date: "2026-10-23",
+      category: "Shopping",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-105",
+      name: "Shell Oil Gas Station",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 52.00,
+      date: "2026-10-22",
+      category: "Transportation",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-106",
+      name: "Netflix & Spotify Subscription",
+      account_name: "Amex Blue Cash (••1024)",
+      amount: 32.98,
+      date: "2026-10-21",
+      category: "Entertainment",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-107",
+      name: "Trader Joe's",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 86.30,
+      date: "2026-10-20",
+      category: "Food & Dining",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-108",
+      name: "CVS Pharmacy & Care",
+      account_name: "Bank of America Checking (••3319)",
+      amount: 45.20,
+      date: "2026-10-19",
+      category: "Healthcare",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-109",
+      name: "AMC Theatres Movies & Snacks",
+      account_name: "Capital One SavorOne (••8832)",
+      amount: 38.50,
+      date: "2026-10-18",
+      category: "Entertainment",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-110",
+      name: "Amazon Marketplace",
+      account_name: "Amex Blue Cash (••1024)",
+      amount: 74.90,
+      date: "2026-10-17",
+      category: "Shopping",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-111",
+      name: "Verizon Wireless & Fios",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 125.00,
+      date: "2026-10-16",
+      category: "Utilities",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-112",
+      name: "Uber Transit & Rides",
+      account_name: "Amex Blue Cash (••1024)",
+      amount: 34.50,
+      date: "2026-10-15",
+      category: "Transportation",
+      is_spending: true,
+      is_internal_transfer: false,
+    },
+    {
+      transaction_id: "tx-113",
+      name: "Chase Sapphire Credit Card AutoPay",
+      account_name: "Chase Total Checking (••4921)",
+      amount: 240.00,
+      date: "2026-10-14",
+      category: "Debt Transfer (Excluded)",
+      is_spending: false,
+      is_internal_transfer: true,
+      matched_debt_name: "Chase Sapphire Preferred",
+    },
+  ]);
+  const [txSearch, setTxSearch] = useState("");
+  const [txAccountFilter, setTxAccountFilter] = useState("all");
+  const [txCategoryFilter, setTxCategoryFilter] = useState("all");
+  const [activeSpendTab, setActiveSpendTab] = useState("transactions"); // "transactions" | "categories"
+  const [showAddTxModal, setShowAddTxModal] = useState(false);
+  const [newTxName, setNewTxName] = useState("");
+  const [newTxAmount, setNewTxAmount] = useState("");
+  const [newTxAccount, setNewTxAccount] = useState("Chase Total Checking (••4921)");
+  const [newTxCategory, setNewTxCategory] = useState("Food & Dining");
+  const [newTxDate, setNewTxDate] = useState(new Date().toISOString().split("T")[0]);
+
   const [categories, setCategories] = useState([
     { id: "housing", name: "Housing & Rent", spent: 1650, budget: 1650, icon: "Home" },
     { id: "groceries", name: "Groceries", spent: 520, budget: 550, icon: "ShoppingBag" },
@@ -200,6 +346,88 @@ export default function Dashboard() {
     { id: "entertainment", name: "Entertainment & Fun", spent: 140, budget: 150, icon: "Film" },
     { id: "subscriptions", name: "Subscriptions", spent: 70, budget: 70, icon: "Sparkles" },
   ]);
+
+  const handleUpdateTxCategory = (txId, newCategory) => {
+    api.put(`/transactions/${txId}/category`, { category: newCategory }).catch(() => {});
+    setTransactions((prev) =>
+      prev.map((t) => (t.transaction_id === txId ? { ...t, category: newCategory } : t))
+    );
+    toast.success(`Assigned "${newCategory}" to transaction!`);
+  };
+
+  const handleCreateTransaction = (e) => {
+    e.preventDefault();
+    if (!newTxName.trim()) {
+      toast.error("Please enter a merchant or transaction name.");
+      return;
+    }
+    const amt = parseFloat(newTxAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+    const isTransfer = newTxCategory === "Debt Transfer (Excluded)";
+    const newTx = {
+      transaction_id: `tx-${Date.now()}`,
+      name: newTxName.trim(),
+      amount: amt,
+      account_name: newTxAccount,
+      category: newTxCategory,
+      date: newTxDate || new Date().toISOString().split("T")[0],
+      is_spending: !isTransfer,
+      is_internal_transfer: isTransfer,
+    };
+    api.post("/transactions", newTx).catch(() => {});
+    setTransactions((prev) => [newTx, ...prev]);
+    setShowAddTxModal(false);
+    setNewTxName("");
+    setNewTxAmount("");
+    toast.success(`Added transaction under "${newTxCategory}"!`);
+  };
+
+  const handleDeleteTransaction = (txId) => {
+    api.delete(`/transactions/${txId}`).catch(() => {});
+    setTransactions((prev) => prev.filter((t) => t.transaction_id !== txId));
+    toast.info("Transaction deleted.");
+  };
+
+  const getCategoryColorClass = (cat) => {
+    switch (cat) {
+      case "Utilities":
+        return "bg-amber-500/15 text-amber-300 border-amber-500/30";
+      case "Food & Dining":
+      case "Food":
+        return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+      case "Shopping":
+        return "bg-purple-500/15 text-purple-300 border-purple-500/30";
+      case "Entertainment":
+        return "bg-pink-500/15 text-pink-300 border-pink-500/30";
+      case "Groceries":
+        return "bg-teal-500/15 text-teal-300 border-teal-500/30";
+      case "Transportation":
+        return "bg-blue-500/15 text-blue-300 border-blue-500/30";
+      case "Healthcare":
+        return "bg-rose-500/15 text-rose-300 border-rose-500/30";
+      case "Subscriptions":
+        return "bg-cyan-500/15 text-cyan-300 border-cyan-500/30";
+      case "Housing":
+        return "bg-indigo-500/15 text-indigo-300 border-indigo-500/30";
+      case "Debt Transfer (Excluded)":
+        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/40 font-bold";
+      default:
+        return "bg-slate-500/15 text-slate-300 border-slate-500/30";
+    }
+  };
+
+  const formatTxDate = (dateStr) => {
+    try {
+      if (!dateStr) return "Recent";
+      const d = new Date(dateStr + "T00:00:00");
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    } catch {
+      return dateStr;
+    }
+  };
 
   const saveBudgetSettings = (updatedBudget) => {
     api.put("/user/budget-planner", updatedBudget).catch(() => {});
@@ -396,12 +624,16 @@ export default function Dashboard() {
       api.post("/strategies/compare", null, { params: { extra_payment: 100 } }),
       api.get("/reminders/upcoming"),
       api.get("/user/budget-planner").catch(() => ({ data: null })),
+      api.get("/transactions").catch(() => ({ data: [] })),
     ])
-      .then(([d, c, bc, r, bp]) => {
+      .then(([d, c, bc, r, bp, tx]) => {
         setDebts(d.data);
         setCompare(c.data);
         setBoostedCompare(bc.data);
         setReminders(r.data);
+        if (tx?.data && Array.isArray(tx.data) && tx.data.length > 0) {
+          setTransactions(tx.data);
+        }
         if (bp?.data) {
           if (bp.data.monthly_income) {
             setBudgetIncome(bp.data.monthly_income);
@@ -714,7 +946,9 @@ export default function Dashboard() {
         );
 
       case "spend_budget_planner": {
-        const totalSpent = categories.reduce((s, e) => s + (parseFloat(e.spent) || 0), 0);
+        const livingTxns = transactions.filter((t) => t.is_spending !== false && !t.is_internal_transfer);
+        const spendTotalFromTx = livingTxns.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+        const totalSpent = spendTotalFromTx > 0 ? spendTotalFromTx : categories.reduce((s, e) => s + (parseFloat(e.spent) || 0), 0);
         const totalBudget = categories.reduce((s, e) => s + (parseFloat(e.budget) || 0), 0);
         const totalDebtPayoffs = totalMin > 0 ? totalMin : 880;
         const totalOutflows = totalSpent + totalDebtPayoffs;
@@ -722,23 +956,60 @@ export default function Dashboard() {
         const budgetRemaining = totalBudget - totalSpent;
         const budgetPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0;
 
+        const filteredTransactions = transactions.filter((tx) => {
+          if (txAccountFilter !== "all" && tx.account_name !== txAccountFilter) return false;
+          if (txCategoryFilter !== "all" && tx.category !== txCategoryFilter) return false;
+          if (txSearch.trim()) {
+            const q = txSearch.toLowerCase();
+            const matchName = tx.name?.toLowerCase().includes(q);
+            const matchAcct = tx.account_name?.toLowerCase().includes(q);
+            const matchCat = tx.category?.toLowerCase().includes(q);
+            if (!matchName && !matchAcct && !matchCat) return false;
+          }
+          return true;
+        });
+
+        const spendAccountOptions = Array.from(new Set(transactions.map((t) => t.account_name).filter(Boolean)));
+
         const getCategoryIcon = (iconName) => {
           switch (iconName) {
-            case "Home": return <Home className="w-4 h-4" />;
-            case "ShoppingBag": return <ShoppingBag className="w-4 h-4" />;
-            case "Zap": return <Zap className="w-4 h-4" />;
-            case "Car": return <Car className="w-4 h-4" />;
-            case "HeartPulse": return <HeartPulse className="w-4 h-4" />;
-            case "Utensils": return <Utensils className="w-4 h-4" />;
-            case "Film": return <Film className="w-4 h-4" />;
-            case "Sparkles": return <Sparkles className="w-4 h-4" />;
-            default: return <DollarSign className="w-4 h-4" />;
+            case "Utilities":
+            case "Zap":
+              return <Zap className="w-4 h-4 text-amber-400" />;
+            case "Food & Dining":
+            case "Food":
+            case "Utensils":
+              return <Utensils className="w-4 h-4 text-emerald-400" />;
+            case "Shopping":
+            case "ShoppingBag":
+              return <ShoppingBag className="w-4 h-4 text-purple-400" />;
+            case "Entertainment":
+            case "Film":
+              return <Film className="w-4 h-4 text-pink-400" />;
+            case "Groceries":
+              return <ShoppingBag className="w-4 h-4 text-teal-400" />;
+            case "Transportation":
+            case "Car":
+              return <Car className="w-4 h-4 text-blue-400" />;
+            case "Healthcare":
+            case "HeartPulse":
+              return <HeartPulse className="w-4 h-4 text-rose-400" />;
+            case "Subscriptions":
+            case "Sparkles":
+              return <Sparkles className="w-4 h-4 text-cyan-400" />;
+            case "Housing":
+            case "Home":
+              return <Home className="w-4 h-4 text-indigo-400" />;
+            case "Debt Transfer (Excluded)":
+              return <ShieldCheck className="w-4 h-4 text-emerald-400" />;
+            default:
+              return <DollarSign className="w-4 h-4 text-slate-400" />;
           }
         };
 
         return (
           <div className="glass rounded-2xl p-6 mb-10 border border-teal-500/20 relative" data-testid="card-spend-budget-planner">
-            {/* Header: Simple Spending Tracker & Budget Planner */}
+            {/* Header: Monthly Spending Tracker & Budget */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/5 mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center shrink-0">
@@ -752,54 +1023,59 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Track actual monthly spending. Plan your own budget or ask DebtWise to auto-build one to hit your debt payoff goal.
+                    Track your income, actual monthly spending, and budget limits across all connected spend accounts.
                   </p>
                 </div>
               </div>
 
-              {/* Action Buttons: The 2 Budget Options */}
+              {/* Action Buttons */}
               <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
                 <button
                   type="button"
-                  onClick={() => handleOpenAutoBuildModal("balanced")}
-                  className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-teal-500/20 flex items-center gap-1.5 transition active:scale-95"
-                  title="Ask website to build a budget for your debt payoff plan"
+                  onClick={() => setShowAddTxModal(true)}
+                  className="px-3.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold shadow-md shadow-teal-600/25 flex items-center gap-1.5 transition active:scale-95"
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Auto-Build for Debt
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Transaction
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddCategoryModal(true)}
+                  onClick={() => handleOpenAutoBuildModal("balanced")}
                   className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition"
+                  title="Ask website to build a budget for your debt payoff plan"
                 >
-                  <Plus className="w-3 h-3 text-teal-400" />
-                  Add Category
+                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                  Auto-Build for Debt
                 </button>
                 <button
                   type="button"
                   onClick={handleRefreshPlaidBudget}
                   className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition"
-                  title="Sync checking transactions via Plaid"
+                  title="Sync checking & card transactions via Plaid"
                 >
                   <RefreshCw className="w-3.5 h-3.5 text-teal-400" />
                 </button>
               </div>
             </div>
 
-            {/* 4 Core Financial KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-              {/* Monthly Income */}
-              <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Take-Home Pay</span>
+            {/* 3 Core Metric Cards Requested by User */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* 1. Income Made This Month */}
+              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5 relative group">
+                <div className="flex items-center justify-between text-slate-400 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-slate-300">Income Made This Month</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => {
                       setTempIncomeInput(String(budgetIncome));
                       setIsEditingIncome(!isEditingIncome);
                     }}
-                    className="text-slate-400 hover:text-teal-400 p-0.5"
+                    className="text-slate-400 hover:text-teal-400 p-1 rounded hover:bg-white/5 transition"
                     title="Edit Monthly Take-Home Pay"
                   >
                     <Edit2 className="w-3 h-3" />
@@ -807,217 +1083,405 @@ export default function Dashboard() {
                 </div>
                 {isEditingIncome ? (
                   <div className="flex items-center gap-1 mt-1">
+                    <span className="text-slate-400 text-sm">$</span>
                     <input
                       type="number"
                       value={tempIncomeInput}
                       onChange={(e) => setTempIncomeInput(e.target.value)}
-                      className="w-24 bg-slate-950 border border-teal-500/60 rounded px-2 py-0.5 text-xs text-white font-mono focus:outline-none"
+                      className="w-28 bg-slate-950 border border-teal-500/60 rounded px-2 py-1 text-sm text-white font-mono focus:outline-none"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={handleSaveIncome}
-                      className="px-2 py-0.5 rounded bg-teal-600 text-white text-[10px] font-semibold"
+                      className="px-2.5 py-1 rounded bg-teal-600 text-white text-xs font-semibold hover:bg-teal-500"
                     >
                       Save
                     </button>
                   </div>
                 ) : (
                   <div>
-                    <span className="font-display text-xl font-bold text-white font-mono">
+                    <span className="font-display text-2xl font-bold text-white font-mono">
                       ${budgetIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[10px] text-slate-400 block mt-0.5 capitalize">{budgetPayFrequency} net inflow</span>
+                    <span className="text-[11px] text-slate-400 block mt-0.5">
+                      Take-home pay &amp; recurring direct deposits
+                    </span>
                   </div>
                 )}
               </div>
 
-              {/* Total Spent This Month */}
-              <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">Total Spent This Month</span>
-                <span className="font-display text-xl font-bold text-teal-400 font-mono block">
-                  ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <span className="text-[10px] text-slate-400 block mt-0.5">Across {categories.length} categories</span>
-              </div>
-
-              {/* Monthly Budget Target */}
-              <div className="p-3.5 rounded-xl bg-slate-900/70 border border-white/5">
-                <div className="flex items-center justify-between text-slate-400 mb-1">
-                  <span className="text-[10px] uppercase font-bold tracking-wider">Monthly Budget</span>
-                  {budgetMode === "auto_debt" ? (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300 flex items-center gap-0.5">
-                      <Sparkles className="w-2.5 h-2.5" /> Auto-Built
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/10 text-slate-300">Custom</span>
-                  )}
-                </div>
-                <span className="font-display text-xl font-bold text-white font-mono block">
-                  ${totalBudget.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-                <span className={`text-[10px] block mt-0.5 ${budgetRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} remaining` : `$${Math.abs(budgetRemaining).toFixed(2)} over budget`}
-                </span>
-              </div>
-
-              {/* Safe Surplus to Pay Off Debt */}
-              <div className="p-3.5 rounded-xl bg-gradient-to-br from-emerald-950/40 to-slate-900/80 border border-emerald-500/30">
-                <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider block mb-1">Safe Debt Payoff Surplus</span>
-                <span className="font-display text-xl font-bold text-emerald-300 font-mono block">
-                  +${safeSurplus.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  <span className="text-xs font-normal text-slate-400 ml-1">/mo</span>
-                </span>
-                <span className="text-[10px] text-emerald-400/80 block mt-0.5">
-                  Available to accelerate debt payoff
-                </span>
-              </div>
-            </div>
-
-            {/* Overall Monthly Spend Progress Bar */}
-            <div className="p-3.5 rounded-xl bg-slate-950/60 border border-white/5 mb-6">
-              <div className="flex items-center justify-between text-xs mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-white">Monthly Budget Progress:</span>
-                  <span className="font-mono text-slate-300">
-                    ${totalSpent.toLocaleString()} spent of ${totalBudget.toLocaleString()} limit ({budgetPct}%)
+              {/* 2. Spent This Month */}
+              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5">
+                <div className="flex items-center justify-between text-slate-400 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-md bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-slate-300">Spent This Month</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-500 font-mono">
+                    {livingTxns.length} txns
                   </span>
                 </div>
-                <span className={`font-mono text-xs font-semibold ${budgetRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} under budget` : `$${Math.abs(budgetRemaining).toFixed(2)} over budget`}
+                <span className="font-display text-2xl font-bold text-teal-400 font-mono block">
+                  ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  Across all connected spend accounts
                 </span>
               </div>
-              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                <div
-                  style={{ width: `${Math.min(100, budgetPct)}%` }}
-                  className={`h-full transition-all duration-500 ${
-                    budgetPct > 100 ? "bg-rose-500" : budgetPct > 90 ? "bg-amber-500" : "bg-teal-500"
-                  }`}
-                />
+
+              {/* 3. Assigned Monthly Budget */}
+              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5">
+                <div className="flex items-center justify-between text-slate-400 mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-6 h-6 rounded-md bg-teal-500/10 text-teal-400 flex items-center justify-center">
+                      <Calculator className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[11px] uppercase font-bold tracking-wider text-slate-300">Assigned Monthly Budget</span>
+                  </div>
+                  {budgetMode === "auto_debt" ? (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" /> Debt-Optimized
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">Custom Budget</span>
+                  )}
+                </div>
+                <div className="flex items-baseline justify-between">
+                  <span className="font-display text-2xl font-bold text-white font-mono">
+                    ${totalBudget.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className={`text-xs font-mono font-semibold ${budgetRemaining >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} left` : `$${Math.abs(budgetRemaining).toFixed(2)} over`}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mt-2">
+                  <div
+                    style={{ width: `${Math.min(100, budgetPct)}%` }}
+                    className={`h-full transition-all duration-500 ${budgetPct > 100 ? "bg-rose-500" : budgetPct > 90 ? "bg-amber-500" : "bg-teal-500"}`}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Category Spending Tracker & Budget Planner Grid */}
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
-                  Spending Categories &amp; Budget Limits
-                </h4>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="text-slate-500 text-[11px]">Click limit value to adjust your budget</span>
-                  {budgetMode === "auto_debt" && (
+            {/* Sub-view Switcher & Toolbar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 mb-4 border-b border-white/5">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveSpendTab("transactions")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
+                    activeSpendTab === "transactions"
+                      ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Transactions List ({filteredTransactions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSpendTab("categories")}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
+                    activeSpendTab === "categories"
+                      ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
+                      : "text-slate-400 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Category Budget Targets ({categories.length})
+                </button>
+              </div>
+
+              {activeSpendTab === "transactions" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search transactions..."
+                      value={txSearch}
+                      onChange={(e) => setTxSearch(e.target.value)}
+                      className="bg-slate-950 border border-white/10 rounded-lg pl-8 pr-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 w-36 sm:w-44"
+                    />
+                  </div>
+
+                  {/* Account Filter */}
+                  <select
+                    value={txAccountFilter}
+                    onChange={(e) => setTxAccountFilter(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+                  >
+                    <option value="all">All Spend Accounts</option>
+                    {spendAccountOptions.map((acct) => (
+                      <option key={acct} value={acct}>
+                        {acct}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Category Filter */}
+                  <select
+                    value={txCategoryFilter}
+                    onChange={(e) => setTxCategoryFilter(e.target.value)}
+                    className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+                  >
+                    <option value="all">All Categories</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Food & Dining">Food & Dining</option>
+                    <option value="Shopping">Shopping</option>
+                    <option value="Entertainment">Entertainment</option>
+                    <option value="Groceries">Groceries</option>
+                    <option value="Transportation">Transportation</option>
+                    <option value="Healthcare">Healthcare</option>
+                    <option value="Subscriptions">Subscriptions</option>
+                    <option value="Housing">Housing</option>
+                    <option value="Debt Transfer (Excluded)">Debt Transfers</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* TAB 1: LIST VIEW OF EACH TRANSACTION ACROSS ALL SPEND ACCOUNTS */}
+            {activeSpendTab === "transactions" && (
+              <div className="space-y-2 mb-6">
+                {filteredTransactions.length === 0 ? (
+                  <div className="p-8 text-center rounded-xl bg-slate-900/40 border border-white/5">
+                    <p className="text-sm text-slate-400">No transactions match your current filters.</p>
                     <button
                       type="button"
                       onClick={() => {
-                        setBudgetMode("custom");
-                        toast.info("Switched to custom budget mode. You can edit any budget limit directly.");
+                        setTxSearch("");
+                        setTxAccountFilter("all");
+                        setTxCategoryFilter("all");
                       }}
-                      className="text-teal-400 hover:text-teal-300 text-xs font-semibold flex items-center gap-1"
+                      className="mt-2 text-xs font-semibold text-teal-400 hover:underline"
                     >
-                      Customize Limits
+                      Clear all filters
                     </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {categories.map((cat) => {
-                  const spent = Number(cat.spent) || 0;
-                  const budget = Number(cat.budget) || 0;
-                  const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-                  const diff = budget - spent;
-                  const isEditing = editingCategoryId === cat.id;
-
-                  return (
-                    <div
-                      key={cat.id}
-                      className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col justify-between"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center shrink-0">
-                            {getCategoryIcon(cat.icon)}
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                    {filteredTransactions.map((tx) => (
+                      <div
+                        key={tx.transaction_id}
+                        className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                      >
+                        {/* Transaction Name, Account & Category Underneath */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-center shrink-0">
+                            {getCategoryIcon(tx.category)}
                           </div>
-                          <span className="text-white font-medium text-xs truncate">{cat.name}</span>
+
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-white truncate">{tx.name}</span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-400 border border-white/10 flex items-center gap-1 font-mono">
+                                <CreditCard className="w-2.5 h-2.5 text-teal-400" />
+                                {tx.account_name}
+                              </span>
+                            </div>
+
+                            {/* Under Each Transaction: Assigned Category Dropdown Pill & Date */}
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              <span className="text-[11px] text-slate-500 font-mono">
+                                {formatTxDate(tx.date)}
+                              </span>
+                              <span className="text-slate-600">•</span>
+
+                              {/* Interactive Category Selector Pill */}
+                              <div className="relative inline-flex items-center">
+                                <select
+                                  value={tx.category}
+                                  onChange={(e) => handleUpdateTxCategory(tx.transaction_id, e.target.value)}
+                                  className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border cursor-pointer appearance-none pr-5 focus:outline-none transition ${getCategoryColorClass(
+                                    tx.category
+                                  )}`}
+                                  title="Click to assign or reassign category"
+                                >
+                                  <option value="Utilities">⚡ Utilities</option>
+                                  <option value="Food & Dining">🍽️ Food & Dining</option>
+                                  <option value="Shopping">🛍️ Shopping</option>
+                                  <option value="Entertainment">🎬 Entertainment</option>
+                                  <option value="Groceries">🛒 Groceries</option>
+                                  <option value="Transportation">🚗 Transportation</option>
+                                  <option value="Healthcare">🩺 Healthcare</option>
+                                  <option value="Subscriptions">📱 Subscriptions</option>
+                                  <option value="Housing">🏠 Housing</option>
+                                  <option value="Debt Transfer (Excluded)">🛡️ Debt Transfer (Excluded)</option>
+                                  <option value="Other">💵 Other</option>
+                                </select>
+                                <ChevronRight className="w-3 h-3 text-slate-400 absolute right-1 pointer-events-none rotate-90" />
+                              </div>
+
+                              {tx.is_internal_transfer && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase">
+                                  Plaid Transfer Isolated ($0 Spend)
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        {cat.auto_recommended && budgetMode === "auto_debt" && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/15 text-teal-300 shrink-0">
-                            Debt Target
-                          </span>
-                        )}
-                      </div>
 
-                      {/* Spent vs Budget */}
-                      <div className="flex items-baseline justify-between text-xs mb-1.5">
-                        <span className="text-slate-400 text-[11px]">
-                          Spent: <strong className="text-white font-mono">${spent.toFixed(2)}</strong>
-                        </span>
+                        {/* Amount & Actions */}
+                        <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 self-end sm:self-center">
+                          {tx.is_internal_transfer ? (
+                            <div className="text-right">
+                              <span className="font-mono text-sm font-semibold text-slate-400 line-through block">
+                                ${Number(tx.amount).toFixed(2)}
+                              </span>
+                              <span className="font-mono text-xs font-bold text-emerald-400 block">
+                                $0.00 spend
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-mono text-sm font-bold text-white">
+                              -${Number(tx.amount).toFixed(2)}
+                            </span>
+                          )}
 
-                        {isEditing ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-slate-400 text-xs">$</span>
-                            <input
-                              type="number"
-                              value={tempCategoryBudget}
-                              onChange={(e) => setTempCategoryBudget(e.target.value)}
-                              className="w-16 bg-slate-950 border border-teal-500 rounded px-1 py-0.5 text-xs text-white font-mono text-right"
-                              autoFocus
-                            />
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateCategoryBudget(cat.id, tempCategoryBudget)}
-                              className="p-1 rounded bg-teal-600 text-white hover:bg-teal-500"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEditingCategoryId(null)}
-                              className="p-1 rounded bg-white/5 text-slate-400"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ) : (
                           <button
                             type="button"
-                            onClick={() => {
-                              setEditingCategoryId(cat.id);
-                              setTempCategoryBudget(String(budget));
-                            }}
-                            className="text-slate-400 hover:text-teal-400 text-[11px] flex items-center gap-1 group"
-                            title="Click to edit budget limit"
+                            onClick={() => handleDeleteTransaction(tx.transaction_id)}
+                            className="p-1 rounded text-slate-500 hover:text-rose-400 opacity-60 group-hover:opacity-100 transition"
+                            title="Delete transaction"
                           >
-                            <span>Limit:</span>
-                            <strong className="text-teal-300 font-mono group-hover:underline">${budget.toFixed(2)}</strong>
-                            <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-teal-400" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
-                        )}
+                        </div>
                       </div>
-
-                      {/* Visual Meter */}
-                      <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
-                        <div
-                          style={{ width: `${Math.min(100, pct)}%` }}
-                          className={`h-full transition-all duration-300 ${
-                            pct > 100 ? "bg-rose-500" : pct > 90 ? "bg-amber-500" : "bg-teal-500"
-                          }`}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px]">
-                        <span className="text-slate-500 font-mono">{pct}% used</span>
-                        <span className={`font-mono font-medium ${diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                          {diff >= 0 ? `$${diff.toFixed(2)} left` : `$${Math.abs(diff).toFixed(2)} over`}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Plaid Reconciled Debt Payoffs Strip (Explicitly Excluded from Spending) */}
+            {/* TAB 2: CATEGORY BUDGET TARGETS GRID */}
+            {activeSpendTab === "categories" && (
+              <div className="space-y-3 mb-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
+                    Spending Categories &amp; Budget Limits
+                  </h4>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-500 text-[11px]">Click limit value to adjust your budget</span>
+                    {budgetMode === "auto_debt" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBudgetMode("custom");
+                          toast.info("Switched to custom budget mode. You can edit any budget limit directly.");
+                        }}
+                        className="text-teal-400 hover:text-teal-300 text-xs font-semibold flex items-center gap-1"
+                      >
+                        Customize Limits
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {categories.map((cat) => {
+                    const spent = Number(cat.spent) || 0;
+                    const budget = Number(cat.budget) || 0;
+                    const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+                    const diff = budget - spent;
+                    const isEditing = editingCategoryId === cat.id;
+
+                    return (
+                      <div
+                        key={cat.id}
+                        className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center shrink-0">
+                              {getCategoryIcon(cat.name || cat.icon)}
+                            </div>
+                            <span className="text-white font-medium text-xs truncate">{cat.name}</span>
+                          </div>
+                          {cat.auto_recommended && budgetMode === "auto_debt" && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-teal-500/15 text-teal-300 shrink-0">
+                              Debt Target
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Spent vs Budget */}
+                        <div className="flex items-baseline justify-between text-xs mb-1.5">
+                          <span className="text-slate-400 text-[11px]">
+                            Spent: <strong className="text-white font-mono">${spent.toFixed(2)}</strong>
+                          </span>
+
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-slate-400 text-xs">$</span>
+                              <input
+                                type="number"
+                                value={tempCategoryBudget}
+                                onChange={(e) => setTempCategoryBudget(e.target.value)}
+                                className="w-16 bg-slate-950 border border-teal-500 rounded px-1 py-0.5 text-xs text-white font-mono text-right"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCategoryBudget(cat.id, tempCategoryBudget)}
+                                className="p-1 rounded bg-teal-600 text-white hover:bg-teal-500"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingCategoryId(null)}
+                                className="p-1 rounded bg-white/5 text-slate-400"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingCategoryId(cat.id);
+                                setTempCategoryBudget(String(budget));
+                              }}
+                              className="text-slate-400 hover:text-teal-400 text-[11px] flex items-center gap-1 group"
+                              title="Click to edit budget limit"
+                            >
+                              <span>Limit:</span>
+                              <strong className="text-teal-300 font-mono group-hover:underline">${budget.toFixed(2)}</strong>
+                              <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-teal-400" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Visual Meter */}
+                        <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
+                          <div
+                            style={{ width: `${Math.min(100, pct)}%` }}
+                            className={`h-full transition-all duration-300 ${
+                              pct > 100 ? "bg-rose-500" : pct > 90 ? "bg-amber-500" : "bg-teal-500"
+                            }`}
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-500 font-mono">{pct}% used</span>
+                          <span className={`font-mono font-medium ${diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                            {diff >= 0 ? `$${diff.toFixed(2)} left` : `$${Math.abs(diff).toFixed(2)} over`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Plaid Reconciled Debt Payoffs Strip */}
             <div className="p-3 rounded-xl bg-slate-900/40 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -1033,6 +1497,115 @@ export default function Dashboard() {
                 100% Excluded from spending (Zero double-counting)
               </span>
             </div>
+
+            {/* Modal: Add Transaction */}
+            {showAddTxModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
+                <div className="glass-strong rounded-2xl p-6 w-full max-w-md border border-white/15 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <h3 className="font-display text-base font-semibold text-white">Add New Transaction</h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddTxModal(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleCreateTransaction} className="space-y-3.5 text-xs">
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Merchant / Store / Description</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Whole Foods, Con Edison, Target"
+                        value={newTxName}
+                        onChange={(e) => setNewTxName(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400"
+                        required
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 mb-1 font-medium">Amount ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          placeholder="45.50"
+                          value={newTxAmount}
+                          onChange={(e) => setNewTxAmount(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-300 mb-1 font-medium">Date</label>
+                        <input
+                          type="date"
+                          value={newTxDate}
+                          onChange={(e) => setNewTxDate(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Spend Account</label>
+                      <select
+                        value={newTxAccount}
+                        onChange={(e) => setNewTxAccount(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400"
+                      >
+                        <option value="Chase Total Checking (••4921)">Chase Total Checking (••4921)</option>
+                        <option value="Amex Blue Cash (••1024)">Amex Blue Cash (••1024)</option>
+                        <option value="Capital One SavorOne (••8832)">Capital One SavorOne (••8832)</option>
+                        <option value="Bank of America Checking (••3319)">Bank of America Checking (••3319)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Assign Category</label>
+                      <select
+                        value={newTxCategory}
+                        onChange={(e) => setNewTxCategory(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400"
+                      >
+                        <option value="Utilities">⚡ Utilities</option>
+                        <option value="Food & Dining">🍽️ Food & Dining</option>
+                        <option value="Shopping">🛍️ Shopping</option>
+                        <option value="Entertainment">🎬 Entertainment</option>
+                        <option value="Groceries">🛒 Groceries</option>
+                        <option value="Transportation">🚗 Transportation</option>
+                        <option value="Healthcare">🩺 Healthcare</option>
+                        <option value="Subscriptions">📱 Subscriptions</option>
+                        <option value="Housing">🏠 Housing</option>
+                        <option value="Debt Transfer (Excluded)">🛡️ Debt Transfer (Excluded)</option>
+                        <option value="Other">💵 Other</option>
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddTxModal(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-600/25"
+                      >
+                        Save Transaction
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
 
             {/* Modal: Auto-Build Budget for Debt Strategy */}
             {showAutoBuildModal && autoBuildResult && (
@@ -1136,80 +1709,6 @@ export default function Dashboard() {
                       Apply This Budget
                     </button>
                   </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal: Add Custom Category */}
-            {showAddCategoryModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-                <div className="glass-strong rounded-2xl p-6 w-full max-w-md border border-white/15 shadow-2xl relative">
-                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
-                    <h3 className="font-display text-base font-semibold text-white">
-                      Add Custom Spending Category
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddCategoryModal(false)}
-                      className="p-1 rounded-lg text-slate-400 hover:text-white"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <form onSubmit={handleAddCustomCategory} className="space-y-4 text-xs">
-                    <div>
-                      <label className="block text-slate-300 mb-1 font-medium">Category Name</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Pet Care, Hobbies, Gym"
-                        value={newCatName}
-                        onChange={(e) => setNewCatName(e.target.value)}
-                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-400"
-                        required
-                        autoFocus
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-300 mb-1 font-medium">Monthly Spent ($)</label>
-                        <input
-                          type="number"
-                          placeholder="80.00"
-                          value={newCatSpent}
-                          onChange={(e) => setNewCatSpent(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-300 mb-1 font-medium">Budget Limit ($)</label>
-                        <input
-                          type="number"
-                          placeholder="100.00"
-                          value={newCatBudget}
-                          onChange={(e) => setNewCatBudget(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white font-mono focus:outline-none focus:border-teal-400"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCategoryModal(false)}
-                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-600/25"
-                      >
-                        Add Category
-                      </button>
-                    </div>
-                  </form>
                 </div>
               </div>
             )}
