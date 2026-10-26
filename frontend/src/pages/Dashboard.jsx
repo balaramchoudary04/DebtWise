@@ -190,6 +190,14 @@ export default function Dashboard() {
   const [newCatSpent, setNewCatSpent] = useState("");
   const [newCatBudget, setNewCatBudget] = useState("");
 
+  // Top 3 Summary Cards Reactive Modals State
+  const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
+  const [draftCategories, setDraftCategories] = useState([]);
+  const [showIncomeModal, setShowIncomeModal] = useState(false);
+  const [tempIncomeVal, setTempIncomeVal] = useState("5200");
+  const [tempPayFreq, setTempPayFreq] = useState("monthly");
+  const [showSpentBreakdownModal, setShowSpentBreakdownModal] = useState(false);
+
   // Spend Accounts Transactions State
   const [transactions, setTransactions] = useState([
     {
@@ -431,6 +439,85 @@ export default function Dashboard() {
 
   const saveBudgetSettings = (updatedBudget) => {
     api.put("/user/budget-planner", updatedBudget).catch(() => {});
+  };
+
+  const handleOpenBudgetEditor = () => {
+    setDraftCategories(categories.map((c) => ({ ...c })));
+    setShowEditBudgetModal(true);
+  };
+
+  const handleUpdateDraftCategoryBudget = (catId, newBudget) => {
+    const num = Math.max(0, parseFloat(newBudget) || 0);
+    setDraftCategories((prev) =>
+      prev.map((c) => (c.id === catId ? { ...c, budget: num, auto_recommended: false } : c))
+    );
+  };
+
+  const handleDraftMatchSpend = () => {
+    setDraftCategories((prev) =>
+      prev.map((c) => {
+        const spent = parseFloat(c.spent) || 0;
+        const rounded = Math.round(Math.max(40, spent * 1.10) / 10) * 10;
+        return { ...c, budget: rounded, auto_recommended: false };
+      })
+    );
+    toast.info("Adjusted category budgets to match actual spending + 10% buffer.");
+  };
+
+  const handleDraftAutoBalanceDebt = () => {
+    const trimRatio = 0.30;
+    setDraftCategories((prev) =>
+      prev.map((cat) => {
+        const flexible = ["dining", "shopping", "entertainment", "subscriptions", "groceries", "transportation"].includes(cat.id);
+        if (flexible) {
+          const spent = parseFloat(cat.spent) || 100;
+          const cut = Math.round(spent * 0.4 * trimRatio);
+          return { ...cat, budget: Math.max(40, Math.round(spent - cut)), auto_recommended: true };
+        }
+        return cat;
+      })
+    );
+    toast.info("Applied debt-optimized budget targets across categories.");
+  };
+
+  const handleSaveDraftBudget = () => {
+    setCategories(draftCategories);
+    setBudgetMode("custom");
+    const newTotal = draftCategories.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0);
+    saveBudgetSettings({
+      monthly_income: budgetIncome,
+      pay_frequency: budgetPayFrequency,
+      budget_mode: "custom",
+      categories: draftCategories,
+      total_budget: newTotal,
+    });
+    setShowEditBudgetModal(false);
+    toast.success(`Assigned monthly budget updated to $${newTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}!`);
+  };
+
+  const handleOpenIncomeModal = () => {
+    setTempIncomeVal(String(budgetIncome));
+    setTempPayFreq(budgetPayFrequency);
+    setShowIncomeModal(true);
+  };
+
+  const handleSaveIncomeModal = () => {
+    const val = parseFloat(tempIncomeVal);
+    if (isNaN(val) || val <= 0) {
+      toast.error("Please enter a valid monthly income.");
+      return;
+    }
+    setBudgetIncome(val);
+    setBudgetPayFrequency(tempPayFreq);
+    saveBudgetSettings({
+      monthly_income: val,
+      pay_frequency: tempPayFreq,
+      budget_mode: budgetMode,
+      categories: categories,
+      total_budget: categories.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0),
+    });
+    setShowIncomeModal(false);
+    toast.success(`Monthly income updated to $${val.toLocaleString()} (${tempPayFreq}).`);
   };
 
   const handleSaveIncome = () => {
@@ -1058,10 +1145,14 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 3 Core Metric Cards Requested by User */}
+            {/* 3 Core Metric Cards Requested by User (All Fully Reactive & Click-to-Edit) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               {/* 1. Income Made This Month */}
-              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5 relative group">
+              <div
+                onClick={handleOpenIncomeModal}
+                className="p-4 rounded-xl bg-slate-900/70 border border-white/5 hover:border-emerald-500/40 hover:bg-slate-900/90 transition cursor-pointer relative group"
+                title="Click card to open and edit monthly take-home income"
+              >
                 <div className="flex items-center justify-between text-slate-400 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
@@ -1071,48 +1162,41 @@ export default function Dashboard() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setTempIncomeInput(String(budgetIncome));
-                      setIsEditingIncome(!isEditingIncome);
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenIncomeModal();
                     }}
-                    className="text-slate-400 hover:text-teal-400 p-1 rounded hover:bg-white/5 transition"
+                    className="text-slate-400 group-hover:text-emerald-400 p-1 rounded hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
                     title="Edit Monthly Take-Home Pay"
                   >
                     <Edit2 className="w-3 h-3" />
+                    <span className="hidden sm:inline font-semibold">Edit</span>
                   </button>
                 </div>
-                {isEditingIncome ? (
-                  <div className="flex items-center gap-1 mt-1">
-                    <span className="text-slate-400 text-sm">$</span>
-                    <input
-                      type="number"
-                      value={tempIncomeInput}
-                      onChange={(e) => setTempIncomeInput(e.target.value)}
-                      className="w-28 bg-slate-950 border border-teal-500/60 rounded px-2 py-1 text-sm text-white font-mono focus:outline-none"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={handleSaveIncome}
-                      className="px-2.5 py-1 rounded bg-teal-600 text-white text-xs font-semibold hover:bg-teal-500"
-                    >
-                      Save
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <span className="font-display text-2xl font-bold text-white font-mono">
-                      ${budgetIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[11px] text-slate-400 block mt-0.5">
-                      Take-home pay &amp; recurring direct deposits
-                    </span>
-                  </div>
-                )}
+
+                <div>
+                  <span className="font-display text-2xl font-bold text-white font-mono">
+                    ${budgetIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                    Take-home pay &amp; recurring direct deposits
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 group-hover:text-emerald-400/90 transition mt-2 pt-2 border-t border-white/5">
+                  <span className="flex items-center gap-1">
+                    <Edit2 className="w-2.5 h-2.5" /> Click card to adjust income
+                  </span>
+                  <span className="font-mono uppercase text-slate-400">{budgetPayFrequency}</span>
+                </div>
               </div>
 
               {/* 2. Spent This Month */}
-              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5">
+              <div
+                onClick={() => setShowSpentBreakdownModal(true)}
+                className="p-4 rounded-xl bg-slate-900/70 border border-white/5 hover:border-rose-500/40 hover:bg-slate-900/90 transition cursor-pointer relative group"
+                title="Click card to view monthly spending breakdown"
+              >
                 <div className="flex items-center justify-between text-slate-400 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-md bg-rose-500/10 text-rose-400 flex items-center justify-center">
@@ -1120,20 +1204,40 @@ export default function Dashboard() {
                     </div>
                     <span className="text-[11px] uppercase font-bold tracking-wider text-slate-300">Spent This Month</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-500 font-mono">
-                    {livingTxns.length} txns
-                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSpentBreakdownModal(true);
+                    }}
+                    className="text-slate-400 group-hover:text-rose-400 p-1 rounded hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
+                  >
+                    <span className="font-mono text-[10px] text-slate-400 mr-0.5">{livingTxns.length} txns</span>
+                    <span className="text-teal-400 font-semibold hidden sm:inline">Details</span>
+                  </button>
                 </div>
+
                 <span className="font-display text-2xl font-bold text-teal-400 font-mono block">
                   ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-[11px] text-slate-400 block mt-0.5">
                   Across all connected spend accounts
                 </span>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 group-hover:text-rose-400/90 transition mt-2 pt-2 border-t border-white/5">
+                  <span className="flex items-center gap-1">
+                    <CreditCard className="w-2.5 h-2.5" /> Click card to view spend details
+                  </span>
+                  <span className="text-emerald-400 font-semibold">$560 CC transfers isolated</span>
+                </div>
               </div>
 
-              {/* 3. Assigned Monthly Budget */}
-              <div className="p-4 rounded-xl bg-slate-900/70 border border-white/5">
+              {/* 3. Assigned Monthly Budget (REACTIVE & CLICK-TO-EDIT) */}
+              <div
+                onClick={handleOpenBudgetEditor}
+                className="p-4 rounded-xl bg-slate-900/70 border border-white/5 hover:border-teal-500/40 hover:bg-slate-900/90 transition cursor-pointer relative group shadow-md hover:shadow-teal-500/10"
+                title="Click card to open and edit monthly budget limits"
+              >
                 <div className="flex items-center justify-between text-slate-400 mb-1.5">
                   <div className="flex items-center gap-1.5">
                     <div className="w-6 h-6 rounded-md bg-teal-500/10 text-teal-400 flex items-center justify-center">
@@ -1141,14 +1245,29 @@ export default function Dashboard() {
                     </div>
                     <span className="text-[11px] uppercase font-bold tracking-wider text-slate-300">Assigned Monthly Budget</span>
                   </div>
-                  {budgetMode === "auto_debt" ? (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 flex items-center gap-0.5">
-                      <Sparkles className="w-2.5 h-2.5" /> Debt-Optimized
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">Custom Budget</span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {budgetMode === "auto_debt" ? (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 flex items-center gap-0.5">
+                        <Sparkles className="w-2.5 h-2.5" /> Debt-Optimized
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 text-slate-300">Custom</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenBudgetEditor();
+                      }}
+                      className="text-slate-400 group-hover:text-teal-300 p-1 rounded hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
+                      title="Open full budget editor"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      <span className="hidden sm:inline font-semibold">Edit</span>
+                    </button>
+                  </div>
                 </div>
+
                 <div className="flex items-baseline justify-between">
                   <span className="font-display text-2xl font-bold text-white font-mono">
                     ${totalBudget.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1157,11 +1276,19 @@ export default function Dashboard() {
                     {budgetRemaining >= 0 ? `$${budgetRemaining.toFixed(2)} left` : `$${Math.abs(budgetRemaining).toFixed(2)} over`}
                   </span>
                 </div>
+
                 <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mt-2">
                   <div
                     style={{ width: `${Math.min(100, budgetPct)}%` }}
                     className={`h-full transition-all duration-500 ${budgetPct > 100 ? "bg-rose-500" : budgetPct > 90 ? "bg-amber-500" : "bg-teal-500"}`}
                   />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 group-hover:text-teal-400/90 transition mt-2 pt-2 border-t border-white/5">
+                  <span className="flex items-center gap-1">
+                    <SlidersHorizontal className="w-2.5 h-2.5" /> Click card to edit monthly budget
+                  </span>
+                  <span className="font-mono text-teal-300 font-semibold">{budgetPct}% used</span>
                 </div>
               </div>
             </div>
@@ -1497,6 +1624,378 @@ export default function Dashboard() {
                 100% Excluded from spending (Zero double-counting)
               </span>
             </div>
+
+            {/* Modal: Edit Monthly Budget (Reactive) */}
+            {showEditBudgetModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+                <div className="glass-strong rounded-3xl p-6 sm:p-7 max-w-2xl w-full max-h-[90vh] flex flex-col border border-teal-500/30 shadow-2xl relative">
+                  {/* Header */}
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4 shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center">
+                        <Calculator className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-base font-semibold text-white">Edit Monthly Budget Limits</h3>
+                        <p className="text-xs text-slate-400">Make reactive edits to your category spending limits and target budget.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowEditBudgetModal(false)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Live Reactive KPI Bar Inside Modal */}
+                  {(() => {
+                    const liveTotal = draftCategories.reduce((s, c) => s + (parseFloat(c.budget) || 0), 0);
+                    const liveDebtMins = totalMin > 0 ? totalMin : 880;
+                    const liveSurplus = budgetIncome - liveTotal - liveDebtMins;
+                    const livePct = budgetIncome > 0 ? Math.round((liveTotal / budgetIncome) * 100) : 0;
+
+                    return (
+                      <div className="space-y-3 mb-4 shrink-0">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                          <div className="p-3 rounded-xl bg-slate-900/80 border border-teal-500/30">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Assigned Budget</span>
+                            <span className="font-display text-lg font-bold text-teal-300 font-mono block mt-0.5">
+                              ${liveTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-[10px] text-slate-500 font-mono">{livePct}% of income</span>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Monthly Income</span>
+                            <span className="font-display text-lg font-bold text-white font-mono block mt-0.5">
+                              ${budgetIncome.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-[10px] text-slate-500">Take-home net</span>
+                          </div>
+
+                          <div className="p-3 rounded-xl bg-slate-900/80 border border-white/5">
+                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Debt Minimums</span>
+                            <span className="font-display text-lg font-bold text-white font-mono block mt-0.5">
+                              ${liveDebtMins.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                            <span className="text-[10px] text-emerald-400">Auto-isolated ($0 spend)</span>
+                          </div>
+
+                          <div className={`p-3 rounded-xl border ${liveSurplus >= 0 ? "bg-emerald-950/40 border-emerald-500/30" : "bg-rose-950/40 border-rose-500/30"}`}>
+                            <span className={`text-[10px] uppercase font-bold tracking-wider block ${liveSurplus >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                              Payoff Buffer
+                            </span>
+                            <span className={`font-display text-lg font-bold font-mono block mt-0.5 ${liveSurplus >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                              {liveSurplus >= 0 ? `+$${liveSurplus.toFixed(2)}` : `-$${Math.abs(liveSurplus).toFixed(2)}`}
+                            </span>
+                            <span className={`text-[10px] block ${liveSurplus >= 0 ? "text-emerald-400/80" : "text-rose-400/80"}`}>
+                              {liveSurplus >= 0 ? "Safe extra payoff power" : "Exceeds monthly income!"}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quick Adjustment Toolbar */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-slate-950/50 border border-white/5 text-xs">
+                          <span className="text-slate-400 text-[11px] font-medium flex items-center gap-1">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                            Quick Presets:
+                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleDraftAutoBalanceDebt}
+                              className="px-2.5 py-1 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[11px] font-semibold transition"
+                            >
+                              ⚡ Auto-Build for Debt
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleDraftMatchSpend}
+                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition"
+                            >
+                              🔄 Match Spend (+10%)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowAddCategoryModal(true)}
+                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition flex items-center gap-1"
+                            >
+                              <Plus className="w-3 h-3 text-teal-400" />
+                              Add Category
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Reactive Categories List (Scrollable) */}
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-2.5 min-h-0">
+                    {draftCategories.map((cat) => {
+                      const spent = parseFloat(cat.spent) || 0;
+                      const budget = parseFloat(cat.budget) || 0;
+                      const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+                      const isOver = spent > budget;
+                      const maxSlider = Math.max(1000, Math.ceil((budget * 2) / 100) * 100);
+
+                      return (
+                        <div
+                          key={cat.id}
+                          className="p-3 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+                                {getCategoryIcon(cat.icon || cat.name)}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-sm font-semibold text-white block truncate">{cat.name}</span>
+                                <span className="text-[11px] text-slate-400 font-mono">
+                                  Spent: <strong className="text-slate-300">${spent.toFixed(2)}</strong>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Direct Number Input */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-slate-400 text-xs font-mono">$</span>
+                              <input
+                                type="number"
+                                step="10"
+                                min="0"
+                                value={cat.budget}
+                                onChange={(e) => handleUpdateDraftCategoryBudget(cat.id, e.target.value)}
+                                className="w-24 bg-slate-950 border border-teal-500/40 rounded-lg px-2.5 py-1 text-xs text-white font-mono text-right focus:outline-none focus:border-teal-400 font-semibold"
+                              />
+                              <span
+                                className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                  isOver ? "bg-rose-500/20 text-rose-300" : "bg-teal-500/20 text-teal-300"
+                                }`}
+                              >
+                                {pct}% used
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Reactive Range Slider */}
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="range"
+                              min="0"
+                              max={maxSlider}
+                              step="25"
+                              value={cat.budget}
+                              onChange={(e) => handleUpdateDraftCategoryBudget(cat.id, e.target.value)}
+                              className="w-full accent-teal-400 h-1.5 bg-slate-800 rounded-lg cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-white/10 mt-4 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDraftCategories(categories.map((c) => ({ ...c })))}
+                      className="text-xs text-slate-400 hover:text-white transition"
+                    >
+                      Reset changes
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditBudgetModal(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveDraftBudget}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white text-xs font-semibold shadow-md shadow-teal-500/20 flex items-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Save &amp; Apply Budget
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Edit Monthly Income (Reactive) */}
+            {showIncomeModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+                <div className="glass-strong rounded-3xl p-6 sm:p-7 max-w-md w-full border border-emerald-500/30 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                        <ArrowDown className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-base font-semibold text-white">Edit Monthly Take-Home Income</h3>
+                        <p className="text-xs text-slate-400">Update your monthly recurring net inflow.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowIncomeModal(false)}
+                      className="p-1 rounded text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 text-xs">
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Monthly Take-Home Pay ($)</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">$</span>
+                        <input
+                          type="number"
+                          step="50"
+                          value={tempIncomeVal}
+                          onChange={(e) => setTempIncomeVal(e.target.value)}
+                          className="w-full bg-slate-950 border border-emerald-500/50 rounded-xl pl-8 pr-3 py-2 text-white font-mono text-base focus:outline-none focus:border-emerald-400 font-semibold"
+                          autoFocus
+                        />
+                      </div>
+                      <span className="text-[11px] text-slate-500 block mt-1">Net pay after taxes and 401(k) deductions.</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 mb-1 font-medium">Pay Frequency</label>
+                      <select
+                        value={tempPayFreq}
+                        onChange={(e) => setTempPayFreq(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-400"
+                      >
+                        <option value="monthly">Monthly (1x / month)</option>
+                        <option value="semi-monthly">Semi-Monthly (2x / month)</option>
+                        <option value="bi-weekly">Bi-Weekly (Every 2 weeks)</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">Total Monthly Net Inflow:</span>
+                      <span className="font-mono font-bold text-emerald-400 text-base">
+                        ${(parseFloat(tempIncomeVal) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => setShowIncomeModal(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveIncomeModal}
+                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-md shadow-emerald-600/25 flex items-center gap-1.5"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Save Income
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal: Monthly Spending Breakdown (Reactive) */}
+            {showSpentBreakdownModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+                <div className="glass-strong rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-rose-500/30 shadow-2xl relative">
+                  <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                        <ArrowUp className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="font-display text-base font-semibold text-white">Monthly Spending Breakdown</h3>
+                        <p className="text-xs text-slate-400">Total spent across all connected accounts this month.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowSpentBreakdownModal(false)}
+                      className="p-1 rounded text-slate-400 hover:text-white"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="space-y-4 text-xs">
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">Total Spent This Month</span>
+                        <span className="font-display text-2xl font-bold text-teal-400 font-mono block mt-0.5">
+                          ${totalSpent.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-white/5 text-slate-300 font-mono">
+                        {livingTxns.length} living transactions
+                      </span>
+                    </div>
+
+                    {/* Spend by Account */}
+                    <div>
+                      <h4 className="text-[11px] uppercase font-bold text-slate-400 tracking-wider mb-2">Spending by Connected Account</h4>
+                      <div className="space-y-1.5">
+                        {spendAccountOptions.map((acct) => {
+                          const acctTxns = livingTxns.filter((t) => t.account_name === acct);
+                          const acctSpent = acctTxns.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                          const acctPct = totalSpent > 0 ? Math.round((acctSpent / totalSpent) * 100) : 0;
+
+                          return (
+                            <div key={acct} className="p-2.5 rounded-lg bg-slate-900/60 border border-white/5 flex items-center justify-between">
+                              <div className="min-w-0">
+                                <span className="text-white font-medium block truncate">{acct}</span>
+                                <span className="text-[10px] text-slate-500">{acctTxns.length} transactions</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono font-bold text-white block">${acctSpent.toFixed(2)}</span>
+                                <span className="text-[10px] text-teal-400 font-mono">{acctPct}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Plaid Isolation Notice */}
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        <strong className="text-emerald-400 font-medium">Plaid Isolation Active:</strong> Credit card and loan payments made from your checking account are automatically excluded ($0.00 spend) so they are not counted twice.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSpentBreakdownModal(false);
+                          setActiveSpendTab("transactions");
+                        }}
+                        className="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md shadow-teal-600/25 flex items-center gap-1.5"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        View All Transactions in List
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modal: Add Transaction */}
             {showAddTxModal && (
