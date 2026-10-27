@@ -22,7 +22,8 @@ import { toast } from "sonner";
 
 export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState("grid"); // "grid" | "agenda"
+  const [viewMode, setViewMode] = useState("agenda"); // default: "agenda" (list view) | "grid" (calendar view)
+  const [listFilter, setListFilter] = useState("all"); // "all" | "pending" | "paid"
   const [calendarData, setCalendarData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeEvent, setActiveEvent] = useState(null);
@@ -219,26 +220,16 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
             <p className="text-label">Payment Schedule</p>
           </div>
           <h3 className="font-display text-2xl font-light tracking-tight mt-1 text-white">
-            Interactive Due Date Calendar
+            Pending Monthly Payments &amp; Due Date Schedule
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Track and check off monthly payments. Synced live with Plaid liabilities.
+            Track pending payments due this month with live Plaid bank detection, or switch to calendar view.
           </p>
         </div>
 
         {/* View Switcher & Month Navigation */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1 text-xs">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-1.5 ${
-                viewMode === "grid"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <CalendarIcon className="w-3.5 h-3.5" /> Month
-            </button>
             <button
               onClick={() => setViewMode("agenda")}
               className={`px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-1.5 ${
@@ -247,7 +238,17 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                   : "text-slate-400 hover:text-white"
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5" /> Agenda
+              <ListFilter className="w-3.5 h-3.5" /> List View
+            </button>
+            <button
+              onClick={() => setViewMode("grid")}
+              className={`px-3 py-1.5 rounded-lg transition font-medium flex items-center gap-1.5 ${
+                viewMode === "grid"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <CalendarIcon className="w-3.5 h-3.5" /> Calendar View
             </button>
           </div>
 
@@ -452,14 +453,57 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
 
       {/* VIEW 2: AGENDA LIST VIEW */}
       {viewMode === "agenda" && (
-        <div className="divide-y divide-white/5">
-          {(!calendarData?.events || calendarData.events.length === 0) ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
-              <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-slate-600" />
-              No debt payments due in {monthNames[month - 1]} {year}.
+        <div className="space-y-3">
+          {/* Quick Filter Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5 text-xs">
+            <span className="font-semibold text-slate-300">
+              Pending &amp; Scheduled Payments ({calendarData?.events?.length || 0})
+            </span>
+            <div className="flex items-center gap-1.5 bg-slate-900/60 p-1 rounded-lg border border-white/5 self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setListFilter("all")}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                  listFilter === "all" ? "bg-white/10 text-white font-semibold" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                All ({calendarData?.events?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setListFilter("pending")}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                  listFilter === "pending" ? "bg-amber-500/20 text-amber-300 font-semibold" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Pending ({(calendarData?.events || []).filter((e) => !e.is_paid).length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setListFilter("paid")}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
+                  listFilter === "paid" ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Paid ({(calendarData?.events || []).filter((e) => e.is_paid).length})
+              </button>
             </div>
-          ) : (
-            calendarData.events.map((evt) => {
+          </div>
+
+          <div className="divide-y divide-white/5">
+            {(!calendarData?.events || calendarData.events.length === 0) ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                <CalendarIcon className="w-8 h-8 mx-auto mb-2 text-slate-600" />
+                No debt payments due in {monthNames[month - 1]} {year}.
+              </div>
+            ) : (
+              calendarData.events
+                .filter((evt) => {
+                  if (listFilter === "pending") return !evt.is_paid;
+                  if (listFilter === "paid") return evt.is_paid;
+                  return true;
+                })
+                .map((evt) => {
               const typeInfo = debtTypeMeta(evt.type);
               return (
                 <div
@@ -553,6 +597,7 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
               );
             })
           )}
+          </div>
         </div>
       )}
 
