@@ -76,7 +76,7 @@ export default function SpendingBudget() {
   const [txSearch, setTxSearch] = useState("");
   const [txAccountFilter, setTxAccountFilter] = useState("all");
   const [txCategoryFilter, setTxCategoryFilter] = useState("all");
-  const [activeSpendTab, setActiveSpendTab] = useState("transactions");
+  const [sbSpendDrawer, setSbSpendDrawer] = useState(null); // null (closed by default) | "transactions" | "budget"
 
   // Reactive Modals State
   const [showEditBudgetModal, setShowEditBudgetModal] = useState(false);
@@ -124,13 +124,13 @@ export default function SpendingBudget() {
       setShowEditBudgetModal(true);
     }
     if (params.get("tab") === "transactions") {
-      setActiveSpendTab("transactions");
+      setSbSpendDrawer("transactions");
       setTimeout(() => {
         const el = document.getElementById("spending-tx-list-table");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 150);
     } else if (params.get("tab") === "budget") {
-      setActiveSpendTab("categories");
+      setSbSpendDrawer("budget");
       setTimeout(() => {
         const el = document.getElementById("spending-budget-categories-grid");
         if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -223,7 +223,7 @@ export default function SpendingBudget() {
 
   const handleViewAllTransactionsFromModal = (accountFilter = "all") => {
     setShowSpentBreakdownModal(false);
-    setActiveSpendTab("transactions");
+    setSbSpendDrawer("transactions");
     setTxSearch("");
     setTxAccountFilter(accountFilter);
     setTxCategoryFilter("all");
@@ -242,15 +242,20 @@ export default function SpendingBudget() {
     );
   };
 
-  const scrollToSection = (sectionId) => {
-    setActiveSpendTab(sectionId);
-    const elementId = sectionId === "budget" ? "spending-budget-categories-grid" : "spending-tx-list-table";
-    const el = document.getElementById(elementId);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      el.classList.add("ring-2", "ring-teal-400", "rounded-2xl", "transition-all", "duration-700");
-      setTimeout(() => el.classList.remove("ring-2", "ring-teal-400"), 2000);
-    }
+  const toggleSbSpendDrawer = (target) => {
+    setSbSpendDrawer((prev) => {
+      const next = prev === target ? null : target;
+      if (next) {
+        const elementId = next === "budget" ? "spending-budget-categories-grid" : "spending-tx-list-table";
+        setTimeout(() => {
+          const el = document.getElementById(elementId);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }, 50);
+      }
+      return next;
+    });
   };
 
   const handleUpdateTxCategory = (txId, newCategory) => {
@@ -531,11 +536,11 @@ export default function SpendingBudget() {
           </div>
         </div>
 
-        {/* 2. Spent This Month */}
+        {/* 2. Spent This Month (CLICK TO OPEN TRANSACTIONS ON DEMAND) */}
         <div
-          onClick={() => setShowSpentBreakdownModal(true)}
-          className="p-5 rounded-2xl bg-slate-900/70 border border-white/5 hover:border-rose-500/40 hover:bg-slate-900/90 transition cursor-pointer relative group shadow-lg"
-          title="Click card to view monthly spending breakdown"
+          onClick={() => toggleSbSpendDrawer("transactions")}
+          className="p-5 rounded-2xl bg-slate-900/70 border border-white/5 hover:border-teal-500/40 hover:bg-slate-900/90 transition cursor-pointer relative group shadow-lg"
+          title="Click card to open monthly transactions list on demand"
         >
           <div className="flex items-center justify-between text-slate-400 mb-2">
             <div className="flex items-center gap-1.5">
@@ -548,12 +553,14 @@ export default function SpendingBudget() {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setShowSpentBreakdownModal(true);
+                toggleSbSpendDrawer("transactions");
               }}
-              className="text-slate-400 group-hover:text-rose-400 p-1 rounded hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
+              className="text-slate-400 group-hover:text-teal-400 p-1 rounded hover:bg-white/5 transition flex items-center gap-1 text-[11px]"
             >
               <span className="font-mono text-[10px] text-slate-400 mr-0.5">{livingTxns.length} txns</span>
-              <span className="text-teal-400 font-semibold">Details</span>
+              <span className="text-teal-400 font-semibold">
+                {sbSpendDrawer === "transactions" ? "Close ▲" : "Open List ▼"}
+              </span>
             </button>
           </div>
 
@@ -564,9 +571,9 @@ export default function SpendingBudget() {
             Across all connected spend accounts
           </span>
 
-          <div className="flex items-center justify-between text-[11px] text-slate-500 group-hover:text-rose-400/90 transition mt-3 pt-3 border-t border-white/5">
+          <div className="flex items-center justify-between text-[11px] text-slate-500 group-hover:text-teal-400/90 transition mt-3 pt-3 border-t border-white/5">
             <span className="flex items-center gap-1">
-              <CreditCard className="w-3 h-3" /> Click card to view spend details
+              <CreditCard className="w-3 h-3" /> Click card to open transactions on demand
             </span>
             <span className="text-emerald-400 font-semibold">$560 CC transfers isolated</span>
           </div>
@@ -658,83 +665,101 @@ export default function SpendingBudget() {
 
       {/* Main Interactive Work Area: Transactions & Budget (Both Visible At All Times) */}
       <div className="glass rounded-2xl p-6 border border-white/5 space-y-8">
-        {/* Quick Section Switcher & Filters Toolbar */}
+        {/* Quick Section Switcher & Filters Toolbar (Click to Open / Close On Demand) */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-white/5">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => scrollToSection("transactions")}
+              onClick={() => toggleSbSpendDrawer("transactions")}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-                activeSpendTab === "transactions"
+                sbSpendDrawer === "transactions"
                   ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-white/10"
               }`}
             >
               <CreditCard className="w-3.5 h-3.5" />
               <span>Transactions</span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {sbSpendDrawer === "transactions" ? "▲ Close" : "▼ Open"}
+              </span>
             </button>
             <button
               type="button"
-              onClick={() => scrollToSection("budget")}
+              onClick={() => toggleSbSpendDrawer("budget")}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-                activeSpendTab === "budget" || activeSpendTab === "categories"
+                sbSpendDrawer === "budget"
                   ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-white/10"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
               <span>Budget</span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {sbSpendDrawer === "budget" ? "▲ Close" : "▼ Open"}
+              </span>
             </button>
+            {sbSpendDrawer && (
+              <button
+                type="button"
+                onClick={() => setSbSpendDrawer(null)}
+                className="px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-transparent transition"
+              >
+                ▲ Close
+              </button>
+            )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search transactions..."
-                value={txSearch}
-                onChange={(e) => setTxSearch(e.target.value)}
-                className="bg-slate-950 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 w-36 sm:w-48"
-              />
+          {sbSpendDrawer === "transactions" && (
+            <div className="flex flex-wrap items-center gap-2 animate-fadeIn">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search transactions..."
+                  value={txSearch}
+                  onChange={(e) => setTxSearch(e.target.value)}
+                  className="bg-slate-950 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 w-36 sm:w-48"
+                />
+              </div>
+
+              <select
+                value={txAccountFilter}
+                onChange={(e) => setTxAccountFilter(e.target.value)}
+                className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+              >
+                <option value="all">All Spend Accounts</option>
+                {spendAccountOptions.map((acct) => (
+                  <option key={acct} value={acct}>
+                    {acct}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={txCategoryFilter}
+                onChange={(e) => setTxCategoryFilter(e.target.value)}
+                className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+              >
+                <option value="all">All Categories</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Food & Dining">Food & Dining</option>
+                <option value="Shopping">Shopping</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Transportation">Transportation</option>
+                <option value="Healthcare">Healthcare</option>
+                <option value="Subscriptions">Subscriptions</option>
+                <option value="Housing">Housing</option>
+                <option value="Debt Transfer (Excluded)">Debt Transfers</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
-
-            <select
-              value={txAccountFilter}
-              onChange={(e) => setTxAccountFilter(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
-            >
-              <option value="all">All Spend Accounts</option>
-              {spendAccountOptions.map((acct) => (
-                <option key={acct} value={acct}>
-                  {acct}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={txCategoryFilter}
-              onChange={(e) => setTxCategoryFilter(e.target.value)}
-              className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
-            >
-              <option value="all">All Categories</option>
-              <option value="Utilities">Utilities</option>
-              <option value="Food & Dining">Food & Dining</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Groceries">Groceries</option>
-              <option value="Transportation">Transportation</option>
-              <option value="Healthcare">Healthcare</option>
-              <option value="Subscriptions">Subscriptions</option>
-              <option value="Housing">Housing</option>
-              <option value="Debt Transfer (Excluded)">Debt Transfers</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+          )}
         </div>
 
-        {/* SECTION 1: CATEGORY BUDGET TARGETS (VISIBLE AT ALL TIMES) */}
-        <div id="spending-budget-categories-grid" className="space-y-4">
+        {/* SECTION 1: CATEGORY BUDGET TARGETS (CLICK TO OPEN ON DEMAND) */}
+        {sbSpendDrawer === "budget" && (
+          <div id="spending-budget-categories-grid" className="space-y-4 animate-fadeIn">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
             <div className="flex items-center gap-2">
               <h4 className="text-xs uppercase font-bold text-slate-300 tracking-wider flex items-center gap-2">
@@ -816,9 +841,11 @@ export default function SpendingBudget() {
             })}
           </div>
         </div>
+        )}
 
-        {/* SECTION 2: TRANSACTIONS LIST (VISIBLE AT ALL TIMES) */}
-        <div id="spending-tx-list-table" className="space-y-3 pt-6 border-t border-white/5">
+        {/* SECTION 2: TRANSACTIONS LIST (CLICK TO OPEN ON DEMAND) */}
+        {sbSpendDrawer === "transactions" && (
+          <div id="spending-tx-list-table" className="space-y-3 pt-6 border-t border-white/5 animate-fadeIn">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
             <div className="flex items-center gap-2">
               <h4 className="text-xs uppercase font-bold text-slate-300 tracking-wider flex items-center gap-2">
@@ -946,6 +973,7 @@ export default function SpendingBudget() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* ======================================================== */}
