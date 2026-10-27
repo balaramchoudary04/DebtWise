@@ -220,6 +220,17 @@ export default function SpendingBudget() {
     );
   };
 
+  const scrollToSection = (sectionId) => {
+    setActiveSpendTab(sectionId);
+    const elementId = sectionId === "budget" ? "spending-budget-categories-grid" : "spending-tx-list-table";
+    const el = document.getElementById(elementId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.classList.add("ring-2", "ring-teal-400", "rounded-2xl", "transition-all", "duration-700");
+      setTimeout(() => el.classList.remove("ring-2", "ring-teal-400"), 2000);
+    }
+  };
+
   const handleUpdateTxCategory = (txId, newCategory) => {
     const isTransfer = newCategory === "Debt Transfer (Excluded)";
     api.put(`/transactions/${txId}/category`, { category: newCategory }).catch(() => {});
@@ -623,267 +634,296 @@ export default function SpendingBudget() {
         </button>
       </div>
 
-      {/* Main Interactive Work Area: Tabs & Toolbar */}
-      <div className="glass rounded-2xl p-6 border border-white/5 space-y-6">
-        {/* Switcher & Filters Toolbar */}
+      {/* Main Interactive Work Area: Transactions & Budget (Both Visible At All Times) */}
+      <div className="glass rounded-2xl p-6 border border-white/5 space-y-8">
+        {/* Quick Section Switcher & Filters Toolbar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-white/5">
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setActiveSpendTab("transactions")}
+              onClick={() => scrollToSection("transactions")}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
                 activeSpendTab === "transactions"
                   ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
               }`}
             >
               <CreditCard className="w-3.5 h-3.5" />
-              Transactions List ({filteredTransactions.length})
+              <span>Transactions</span>
             </button>
             <button
               type="button"
-              onClick={() => setActiveSpendTab("categories")}
+              onClick={() => scrollToSection("budget")}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${
-                activeSpendTab === "categories"
+                activeSpendTab === "budget" || activeSpendTab === "categories"
                   ? "bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm"
-                  : "text-slate-400 hover:text-white hover:bg-white/5"
+                  : "text-slate-400 hover:text-white hover:bg-white/5 border border-transparent"
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
-              Category Budget Targets ({categories.length})
+              <span>Budget</span>
             </button>
           </div>
 
-          {activeSpendTab === "transactions" && (
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search transactions..."
-                  value={txSearch}
-                  onChange={(e) => setTxSearch(e.target.value)}
-                  className="bg-slate-950 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 w-36 sm:w-48"
-                />
-              </div>
-
-              <select
-                value={txAccountFilter}
-                onChange={(e) => setTxAccountFilter(e.target.value)}
-                className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
-              >
-                <option value="all">All Spend Accounts</option>
-                {spendAccountOptions.map((acct) => (
-                  <option key={acct} value={acct}>
-                    {acct}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={txCategoryFilter}
-                onChange={(e) => setTxCategoryFilter(e.target.value)}
-                className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
-              >
-                <option value="all">All Categories</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Food & Dining">Food & Dining</option>
-                <option value="Shopping">Shopping</option>
-                <option value="Entertainment">Entertainment</option>
-                <option value="Groceries">Groceries</option>
-                <option value="Transportation">Transportation</option>
-                <option value="Healthcare">Healthcare</option>
-                <option value="Subscriptions">Subscriptions</option>
-                <option value="Housing">Housing</option>
-                <option value="Debt Transfer (Excluded)">Debt Transfers</option>
-                <option value="Other">Other</option>
-              </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search transactions..."
+                value={txSearch}
+                onChange={(e) => setTxSearch(e.target.value)}
+                className="bg-slate-950 border border-white/10 rounded-lg pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-400 w-36 sm:w-48"
+              />
             </div>
-          )}
+
+            <select
+              value={txAccountFilter}
+              onChange={(e) => setTxAccountFilter(e.target.value)}
+              className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+            >
+              <option value="all">All Spend Accounts</option>
+              {spendAccountOptions.map((acct) => (
+                <option key={acct} value={acct}>
+                  {acct}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={txCategoryFilter}
+              onChange={(e) => setTxCategoryFilter(e.target.value)}
+              className="bg-slate-950 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-teal-400"
+            >
+              <option value="all">All Categories</option>
+              <option value="Utilities">Utilities</option>
+              <option value="Food & Dining">Food & Dining</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Entertainment">Entertainment</option>
+              <option value="Groceries">Groceries</option>
+              <option value="Transportation">Transportation</option>
+              <option value="Healthcare">Healthcare</option>
+              <option value="Subscriptions">Subscriptions</option>
+              <option value="Housing">Housing</option>
+              <option value="Debt Transfer (Excluded)">Debt Transfers</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
         </div>
 
-        {/* TAB 1: TRANSACTIONS LIST */}
-        {activeSpendTab === "transactions" && (
-          <div id="spending-tx-list-table" className="space-y-2">
-            {filteredTransactions.length === 0 ? (
-              <div className="p-10 text-center rounded-2xl bg-slate-900/40 border border-white/5">
-                <p className="text-sm text-slate-400">No transactions match your current filters.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTxSearch("");
-                    setTxAccountFilter("all");
-                    setTxCategoryFilter("all");
-                  }}
-                  className="mt-2 text-xs font-semibold text-teal-400 hover:underline"
-                >
-                  Clear all filters
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
-                {filteredTransactions.map((tx) => (
-                  <div
-                    key={tx.transaction_id}
-                    className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-center shrink-0">
-                        {getCategoryIcon(tx.category)}
-                      </div>
-
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold text-white truncate">{tx.name}</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-400 border border-white/10 flex items-center gap-1 font-mono">
-                            <CreditCard className="w-2.5 h-2.5 text-teal-400" />
-                            {tx.account_name}
-                          </span>
-                        </div>
-
-                        {/* Category Selector Underneath Each Transaction */}
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-[11px] text-slate-500 font-mono">
-                            {formatTxDate(tx.date)}
-                          </span>
-                          <span className="text-slate-600">•</span>
-
-                          <div className="relative inline-flex items-center">
-                            <select
-                              value={tx.category}
-                              onChange={(e) => handleUpdateTxCategory(tx.transaction_id, e.target.value)}
-                              className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border cursor-pointer appearance-none pr-5 focus:outline-none transition ${getCategoryColorClass(
-                                tx.category
-                              )}`}
-                              title="Click to assign or reassign category"
-                            >
-                              <option value="Utilities">⚡ Utilities</option>
-                              <option value="Food & Dining">🍽️ Food & Dining</option>
-                              <option value="Shopping">🛍️ Shopping</option>
-                              <option value="Entertainment">🎬 Entertainment</option>
-                              <option value="Groceries">🛒 Groceries</option>
-                              <option value="Transportation">🚗 Transportation</option>
-                              <option value="Healthcare">🩺 Healthcare</option>
-                              <option value="Subscriptions">📱 Subscriptions</option>
-                              <option value="Housing">🏠 Housing</option>
-                              <option value="Debt Transfer (Excluded)">🛡️ Debt Transfer (Excluded)</option>
-                              <option value="Other">💵 Other</option>
-                            </select>
-                            <ChevronRight className="w-3 h-3 text-slate-400 absolute right-1 pointer-events-none rotate-90" />
-                          </div>
-
-                          {tx.is_internal_transfer && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase">
-                              Plaid Transfer Isolated ($0 Spend)
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 self-end sm:self-center">
-                      {tx.is_internal_transfer ? (
-                        <div className="text-right">
-                          <span className="font-mono text-sm font-semibold text-slate-400 line-through block">
-                            ${Number(tx.amount).toFixed(2)}
-                          </span>
-                          <span className="font-mono text-xs font-bold text-emerald-400 block">
-                            $0.00 spend
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="font-mono text-sm font-bold text-white">
-                          -${Number(tx.amount).toFixed(2)}
-                        </span>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTransaction(tx.transaction_id)}
-                        className="p-1 rounded text-slate-500 hover:text-rose-400 opacity-60 group-hover:opacity-100 transition"
-                        title="Delete transaction"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB 2: CATEGORY BUDGET TARGETS */}
-        {activeSpendTab === "categories" && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs uppercase font-bold text-slate-400 tracking-wider">
-                Category Spending &amp; Budget Limits
+        {/* SECTION 1: CATEGORY BUDGET TARGETS (VISIBLE AT ALL TIMES) */}
+        <div id="spending-budget-categories-grid" className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs uppercase font-bold text-slate-300 tracking-wider flex items-center gap-2">
+                <Layers className="w-4 h-4 text-teal-400" />
+                Category Budget Targets ({categories.length})
               </h4>
+              <span className="text-[10px] text-slate-500 hidden sm:inline">• Click limit value or card to adjust</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenBudgetEditor}
+                className="px-3 py-1.5 rounded-lg bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 text-xs font-semibold border border-teal-500/30 flex items-center gap-1.5 transition"
+              >
+                <SlidersHorizontal className="w-3 h-3" />
+                Edit Limits
+              </button>
               <button
                 type="button"
                 onClick={() => setShowAddCategoryModal(true)}
-                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-teal-400 text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition"
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-semibold border border-white/10 flex items-center gap-1.5 transition"
               >
                 <Plus className="w-3 h-3" />
                 Add Category
               </button>
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {categories.map((cat) => {
-                const spent = Number(cat.spent) || 0;
-                const budget = Number(cat.budget) || 0;
-                const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
-                const diff = budget - spent;
-                const barColor = pct > 100 ? "bg-rose-500" : pct > 90 ? "bg-amber-500" : "bg-teal-500";
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {categories.map((cat) => {
+              const spent = Number(cat.spent) || 0;
+              const budget = Number(cat.budget) || 0;
+              const pct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+              const diff = budget - spent;
+              const barColor = pct > 100 ? "bg-rose-500" : pct > 90 ? "bg-amber-500" : "bg-teal-500";
 
-                return (
-                  <div
-                    key={cat.id}
-                    className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col justify-between"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center shrink-0">
-                          {getCategoryIcon(cat.icon || cat.name)}
-                        </div>
-                        <span className="text-white font-medium text-xs truncate">{cat.name}</span>
+              return (
+                <div
+                  key={cat.id}
+                  className="p-4 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-teal-500/10 text-teal-400 border border-teal-500/20 flex items-center justify-center shrink-0">
+                        {getCategoryIcon(cat.icon || cat.name)}
                       </div>
-                    </div>
-
-                    <div className="flex items-baseline justify-between text-xs mb-1.5">
-                      <span className="text-slate-400 text-[11px]">
-                        Spent: <strong className="text-white font-mono">${spent.toFixed(2)}</strong>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleOpenBudgetEditor}
-                        className="text-slate-400 hover:text-teal-400 text-[11px] flex items-center gap-1 group"
-                        title="Click to edit budget limit"
-                      >
-                        <span>Limit:</span>
-                        <strong className="text-teal-300 font-mono group-hover:underline">${budget.toFixed(2)}</strong>
-                        <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-teal-400" />
-                      </button>
-                    </div>
-
-                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
-                      <div style={{ width: `${Math.min(100, pct)}%` }} className={`h-full transition-all duration-300 ${barColor}`} />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500 font-mono">{pct}% used</span>
-                      <span className={`font-mono font-medium ${diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {diff >= 0 ? `$${diff.toFixed(2)} left` : `$${Math.abs(diff).toFixed(2)} over`}
-                      </span>
+                      <span className="text-white font-medium text-xs truncate">{cat.name}</span>
                     </div>
                   </div>
-                );
-              })}
+
+                  <div className="flex items-baseline justify-between text-xs mb-1.5">
+                    <span className="text-slate-400 text-[11px]">
+                      Spent: <strong className="text-white font-mono">${spent.toFixed(2)}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleOpenBudgetEditor}
+                      className="text-slate-400 hover:text-teal-400 text-[11px] flex items-center gap-1 group"
+                      title="Click to edit budget limit"
+                    >
+                      <span>Limit:</span>
+                      <strong className="text-teal-300 font-mono group-hover:underline">${budget.toFixed(2)}</strong>
+                      <Edit2 className="w-2.5 h-2.5 text-slate-500 group-hover:text-teal-400" />
+                    </button>
+                  </div>
+
+                  <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
+                    <div style={{ width: `${Math.min(100, pct)}%` }} className={`h-full transition-all duration-300 ${barColor}`} />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-slate-500 font-mono">{pct}% used</span>
+                    <span className={`font-mono font-medium ${diff >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {diff >= 0 ? `$${diff.toFixed(2)} left` : `$${Math.abs(diff).toFixed(2)} over`}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* SECTION 2: TRANSACTIONS LIST (VISIBLE AT ALL TIMES) */}
+        <div id="spending-tx-list-table" className="space-y-3 pt-6 border-t border-white/5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs uppercase font-bold text-slate-300 tracking-wider flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-teal-400" />
+                All Account Transactions ({filteredTransactions.length})
+              </h4>
+              <span className="text-[10px] text-emerald-400 font-semibold hidden sm:inline">• Live Plaid isolation active</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 mr-2">Showing {filteredTransactions.length} of {transactions.length} total</span>
+              <button
+                type="button"
+                onClick={() => setShowAddTxModal(true)}
+                className="px-3 py-1.5 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 text-xs font-semibold border border-teal-500/30 flex items-center gap-1.5 transition"
+              >
+                <Plus className="w-3 h-3" />
+                Add Transaction
+              </button>
             </div>
           </div>
-        )}
+
+          {filteredTransactions.length === 0 ? (
+            <div className="p-10 text-center rounded-2xl bg-slate-900/40 border border-white/5">
+              <p className="text-sm text-slate-400">No transactions match your current filters.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setTxSearch("");
+                  setTxAccountFilter("all");
+                  setTxCategoryFilter("all");
+                }}
+                className="mt-2 text-xs font-semibold text-teal-400 hover:underline"
+              >
+                Clear all filters
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {filteredTransactions.map((tx) => (
+                <div
+                  key={tx.transaction_id}
+                  className="p-3.5 rounded-xl bg-slate-900/60 border border-white/5 hover:border-white/15 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-slate-800/80 border border-white/10 flex items-center justify-center shrink-0">
+                      {getCategoryIcon(tx.category)}
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-white truncate">{tx.name}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/5 text-slate-400 border border-white/10 flex items-center gap-1 font-mono">
+                          <CreditCard className="w-2.5 h-2.5 text-teal-400" />
+                          {tx.account_name}
+                        </span>
+                      </div>
+
+                      {/* Category Selector Underneath Each Transaction */}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <span className="text-[11px] text-slate-500 font-mono">
+                          {formatTxDate(tx.date)}
+                        </span>
+                        <span className="text-slate-600">•</span>
+
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={tx.category}
+                            onChange={(e) => handleUpdateTxCategory(tx.transaction_id, e.target.value)}
+                            className={`text-[11px] font-semibold rounded-lg px-2 py-0.5 border cursor-pointer appearance-none pr-5 focus:outline-none transition ${getCategoryColorClass(
+                              tx.category
+                            )}`}
+                            title="Click to assign or reassign category"
+                          >
+                            <option value="Utilities">⚡ Utilities</option>
+                            <option value="Food & Dining">🍽️ Food & Dining</option>
+                            <option value="Shopping">🛍️ Shopping</option>
+                            <option value="Entertainment">🎬 Entertainment</option>
+                            <option value="Groceries">🛒 Groceries</option>
+                            <option value="Transportation">🚗 Transportation</option>
+                            <option value="Healthcare">🩺 Healthcare</option>
+                            <option value="Subscriptions">📱 Subscriptions</option>
+                            <option value="Housing">🏠 Housing</option>
+                            <option value="Debt Transfer (Excluded)">🛡️ Debt Transfer (Excluded)</option>
+                            <option value="Other">💵 Other</option>
+                          </select>
+                          <ChevronRight className="w-3 h-3 text-slate-400 absolute right-1 pointer-events-none rotate-90" />
+                        </div>
+
+                        {tx.is_internal_transfer && (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 uppercase">
+                            Plaid Transfer Isolated ($0 Spend)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 self-end sm:self-center">
+                    {tx.is_internal_transfer ? (
+                      <div className="text-right">
+                        <span className="font-mono text-sm font-semibold text-slate-400 line-through block">
+                          ${Number(tx.amount).toFixed(2)}
+                        </span>
+                        <span className="font-mono text-xs font-bold text-emerald-400 block">
+                          $0.00 spend
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="font-mono text-sm font-bold text-white">
+                        -${Number(tx.amount).toFixed(2)}
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTransaction(tx.transaction_id)}
+                      className="p-1 rounded text-slate-500 hover:text-rose-400 opacity-60 group-hover:opacity-100 transition"
+                      title="Delete transaction"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ======================================================== */}
