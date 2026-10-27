@@ -17,10 +17,16 @@ import {
   ExternalLink,
   Zap,
   Bell,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
+export default function PaymentCalendar({
+  debts = [],
+  onRefreshDebts,
+  strategy = "avalanche",
+  extra = 200,
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState("agenda"); // default: "agenda" (list view) | "grid" (calendar view)
   const [listFilter, setListFilter] = useState("all"); // "all" | "pending" | "paid"
@@ -210,6 +216,28 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
   const allPaid = totalCount > 0 && paidCount === totalCount;
   const progressPct = totalDue > 0 ? Math.min(100, Math.round((totalPaid / totalDue) * 100)) : 0;
 
+  const extraPayment = extra || 200;
+  const priorityTarget =
+    calendarData?.events?.find((e) => e.is_priority) ||
+    (calendarData?.events || []).slice().sort((a, b) => (b.apr || 0) - (a.apr || 0))[0];
+  const totalPaydayBudget = totalDue + extraPayment;
+
+  const copyPaydayPlan = () => {
+    if (!calendarData?.events || calendarData.events.length === 0) return;
+    let text = `DEBTWISE PAYDAY BLUEPRINT — ${monthNames[month - 1]} ${year}\n`;
+    text += `Strategy: Save Most Money (Avalanche) + ${fmtMoney(extraPayment)}/mo extra\n`;
+    text += `Total Monthly Payday Allocation: ${fmtMoney(totalPaydayBudget)}\n\n`;
+    calendarData.events.forEach((evt, i) => {
+      const isTarget = priorityTarget && evt.debt_id === priorityTarget.debt_id;
+      const amt = isTarget ? evt.min_payment + extraPayment : evt.min_payment;
+      text += `${i + 1}. ${evt.name} (Due ${monthNames[month - 1]} ${evt.day}): Pay ${fmtMoney(amt)}`;
+      if (isTarget) text += ` (Min ${fmtMoney(evt.min_payment)} + ${fmtMoney(extraPayment)} extra ⭐ TARGET)`;
+      text += `\n`;
+    });
+    navigator.clipboard.writeText(text);
+    toast.success("Copied Payday Blueprint instructions to clipboard!");
+  };
+
   return (
     <div className="glass rounded-2xl p-6 mb-10" data-testid="interactive-payment-calendar">
       {/* Calendar Header */}
@@ -217,18 +245,26 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
         <div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></span>
-            <p className="text-label">Payment Schedule</p>
+            <p className="text-label">Payment Schedule &amp; Payday Blueprint</p>
           </div>
           <h3 className="font-display text-2xl font-light tracking-tight mt-1 text-white">
-            Pending Monthly Payments &amp; Due Date Schedule
+            Pending Payments &amp; Payday Blueprint
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Track pending payments due this month with live Plaid bank detection, or switch to calendar view.
+            Track live due dates, exact recommended payday allocations, and Plaid bank reconciliation in one view.
           </p>
         </div>
 
-        {/* View Switcher & Month Navigation */}
+        {/* View Switcher, Copy Plan & Month Navigation */}
         <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={copyPaydayPlan}
+            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-medium border border-white/10 transition flex items-center gap-1.5"
+            title="Copy payday plan to clipboard"
+          >
+            <Copy className="w-3.5 h-3.5" /> Copy Plan
+          </button>
+
           <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1 text-xs">
             <button
               onClick={() => setViewMode("agenda")}
@@ -282,21 +318,24 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
         </div>
       </div>
 
-      {/* Monthly Cash Flow & Payment Progress Bar */}
+      {/* Monthly Cash Flow & Payday Allocation Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-white/[0.02] border border-white/5 mb-6">
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total Bills Due</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Monthly Minimums</span>
           <span className="font-display text-xl font-medium text-white">{fmtMoney(totalDue)}</span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">Required base payments</span>
         </div>
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Paid So Far</span>
-          <span className="font-display text-xl font-medium text-emerald-400">{fmtMoney(totalPaid)}</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Extra Strategy Power</span>
+          <span className="font-display text-xl font-medium text-blue-400">+{fmtMoney(extraPayment)}</span>
+          <span className="text-[10px] text-blue-300/70 block mt-0.5">Accelerates target debt</span>
         </div>
         <div>
-          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Remaining to Pay</span>
-          <span className={`font-display text-xl font-medium ${totalRemaining > 0 ? "text-amber-400" : "text-slate-400"}`}>
-            {fmtMoney(totalRemaining)}
+          <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total Payday Allocation</span>
+          <span className="font-display text-xl font-medium text-emerald-400">
+            {fmtMoney(totalPaydayBudget)}
           </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">{fmtMoney(totalPaid)} paid so far</span>
         </div>
         <div>
           <div className="flex items-center justify-between text-xs mb-1">
@@ -453,7 +492,40 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
 
       {/* VIEW 2: AGENDA LIST VIEW */}
       {viewMode === "agenda" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          {/* Priority Focus Target Callout Banner */}
+          {priorityTarget && (
+            <div className="p-4 rounded-xl bg-blue-600/10 border border-blue-500/30 flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded border border-blue-400/30">
+                      Priority Focus Target
+                    </span>
+                    <span className="text-xs text-slate-400">Due {monthNames[month - 1]} {priorityTarget.day}</span>
+                  </div>
+                  <h4 className="font-display text-lg font-medium text-white">{priorityTarget.name}</h4>
+                  <p className="text-xs text-slate-300 mt-0.5 max-w-xl">
+                    Highest APR ({priorityTarget.apr}%) — receives minimum payment ({fmtMoney(priorityTarget.min_payment)}) plus all available extra funds (+{fmtMoney(extraPayment)}) to eliminate expensive interest first.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-right shrink-0 bg-slate-900/80 p-3 rounded-xl border border-white/5">
+                <span className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold block">Total Recommended Pay</span>
+                <div className="font-display text-2xl font-bold text-emerald-400">
+                  {fmtMoney(priorityTarget.min_payment + extraPayment)}
+                </div>
+                <span className="text-[11px] text-slate-400">
+                  Min {fmtMoney(priorityTarget.min_payment)} + <strong className="text-blue-300 font-mono">+{fmtMoney(extraPayment)} extra</strong>
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Quick Filter Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/5 text-xs">
             <span className="font-semibold text-slate-300">
@@ -505,10 +577,13 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                 })
                 .map((evt) => {
               const typeInfo = debtTypeMeta(evt.type);
+              const isTarget = priorityTarget && evt.debt_id === priorityTarget.debt_id;
               return (
                 <div
                   key={evt.debt_id}
-                  className="py-3 px-2 flex items-center justify-between gap-4 hover:bg-white/[0.02] rounded-xl transition"
+                  className={`py-3 px-2.5 flex items-center justify-between gap-4 rounded-xl transition ${
+                    isTarget ? "bg-blue-950/20 border border-blue-500/30" : "hover:bg-white/[0.02]"
+                  }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Day Pill */}
@@ -530,6 +605,11 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                         <h4 className={`font-medium text-sm text-white truncate ${evt.is_paid ? "line-through text-slate-400" : ""}`}>
                           {evt.name}
                         </h4>
+                        {isTarget && (
+                          <span className="text-[9px] uppercase tracking-wider font-bold text-blue-300 bg-blue-500/20 px-1.5 py-0.5 rounded border border-blue-400/30 flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5" /> Priority Target
+                          </span>
+                        )}
                         {evt.is_plaid && (
                           <span className="text-[9px] uppercase tracking-wider font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <Link2 className="w-2.5 h-2.5" /> Plaid
@@ -538,11 +618,6 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                         {evt.auto_detected && (
                           <span className="text-[9px] uppercase tracking-wider font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
                             <Zap className="w-2.5 h-2.5" /> Auto-Detected
-                          </span>
-                        )}
-                        {evt.is_priority && !evt.is_paid && (
-                          <span className="text-[9px] uppercase tracking-wider font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                            <Sparkles className="w-2.5 h-2.5" /> Strategy Focus
                           </span>
                         )}
                       </div>
@@ -557,8 +632,15 @@ export default function PaymentCalendar({ debts = [], onRefreshDebts }) {
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-right">
                       <div className="text-sm font-semibold font-mono text-white">
-                        {fmtMoney(evt.min_payment)}
+                        {isTarget ? (
+                          <span className="text-emerald-400 font-bold">{fmtMoney(evt.min_payment + extraPayment)}</span>
+                        ) : (
+                          fmtMoney(evt.min_payment)
+                        )}
                       </div>
+                      <span className="text-[10px] text-slate-400 block">
+                        {isTarget ? `Min ${fmtMoney(evt.min_payment)} + ${fmtMoney(extraPayment)} extra` : "Minimum only"}
+                      </span>
                       <span
                         className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
                           evt.is_paid

@@ -70,8 +70,7 @@ const DEFAULT_WIDGETS = [
   { id: "plaid_reconciliation", title: "Automated Payment Reconciliation & Protection Alerts", desc: "Real-time Plaid payment matching from checking accounts and credit score protection alerts" },
   { id: "spend_budget_planner", title: "Spend Calculator & Budget Planner", desc: "Live living expense tracking, 50/30/20 cash flow breakdown, and surplus-to-debt accelerator" },
   { id: "breakdown_timeline", title: "Overall Progress Glance (Debt, Spending & Budget)", desc: "Clear real-time progress tracking across Debt Payment, Living Spending, and Budget Limits" },
-  { id: "calendar", title: "Pending Monthly Payments & Due Date Schedule", desc: "List view of pending debt payments in the month with interactive calendar view option" },
-  { id: "payday_instructions", title: "Exact Monthly Payment Instructions", desc: "Zero-guesswork payday blueprint and strategy extra allocation" },
+  { id: "calendar", title: "Pending Payments & Payday Blueprint", desc: "Consolidated monthly due dates, strategy extra allocation, and interactive calendar switcher" },
   { id: "milestones", title: "Payoff Milestones", desc: "Achievements, motivation badges, and milestone progress" },
   { id: "debt_history", title: "Principal Reduction Trend", desc: "Historical month-over-month decline and total debt eliminated" },
   { id: "payoff_pipeline", title: "Payoff Order Pipeline", desc: "Step-by-step account payoff sequence under your strategy" },
@@ -2354,13 +2353,8 @@ export default function Dashboard() {
         );
 
       case "payday_instructions":
-        return (
-          <MonthlyPaymentInstructions
-            debts={debts}
-            strategy="avalanche"
-            extra={100}
-          />
-        );
+        // Consolidated into calendar ("Pending Payments & Payday Blueprint")
+        return null;
 
       case "breakdown_timeline": {
         const livingTxns = transactions.filter((t) => t.is_spending !== false && !t.is_internal_transfer);
@@ -2772,6 +2766,8 @@ export default function Dashboard() {
         return (
           <PaymentCalendar
             debts={debts}
+            strategy="avalanche"
+            extra={200}
             onRefreshDebts={() => api.get("/debts").then((r) => setDebts(r.data))}
           />
         );
