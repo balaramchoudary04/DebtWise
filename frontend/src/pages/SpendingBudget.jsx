@@ -27,10 +27,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function SpendingBudget() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // State: Budget & Income
   const [budgetIncome, setBudgetIncome] = useState(5200);
@@ -115,6 +116,27 @@ export default function SpendingBudget() {
       }
     });
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("action") === "edit-budget") {
+      setDraftCategories(categories.map((c) => ({ ...c })));
+      setShowEditBudgetModal(true);
+    }
+    if (params.get("tab") === "transactions") {
+      setActiveSpendTab("transactions");
+      setTimeout(() => {
+        const el = document.getElementById("spending-tx-list-table");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    } else if (params.get("tab") === "budget") {
+      setActiveSpendTab("categories");
+      setTimeout(() => {
+        const el = document.getElementById("spending-budget-categories-grid");
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+    }
+  }, [location.search, categories]);
 
   const saveBudgetSettings = (updatedBudget) => {
     api.put("/user/budget-planner", updatedBudget).catch(() => {});

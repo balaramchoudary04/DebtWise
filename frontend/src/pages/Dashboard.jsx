@@ -2510,7 +2510,7 @@ export default function Dashboard() {
                 </div>
 
                 <button
-                  onClick={() => navigate("/spending")}
+                  onClick={() => navigate("/spending?tab=transactions")}
                   className="mt-5 w-full py-2 px-3 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                 >
                   View Spending & Transactions <ArrowRight className="w-3.5 h-3.5" />
@@ -2577,7 +2577,7 @@ export default function Dashboard() {
                 </div>
 
                 <button
-                  onClick={() => navigate("/spending")}
+                  onClick={() => navigate("/spending?action=edit-budget")}
                   className="mt-5 w-full py-2 px-3 rounded-xl bg-purple-600/15 hover:bg-purple-600/25 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
                 >
                   Adjust Monthly Budget <ArrowRight className="w-3.5 h-3.5" />
